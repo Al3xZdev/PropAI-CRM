@@ -4,6 +4,7 @@ import {
   Zap, History, ChevronRight, Home,
   LogOut, User, X
 } from 'lucide-react'
+import NotificationBell from './NotificationBell'
 
 const Sidebar = ({ currentPage, onNavigate, stats, user, onLogout }) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false)
@@ -68,6 +69,13 @@ const Sidebar = ({ currentPage, onNavigate, stats, user, onLogout }) => {
             )
           })}
         </nav>
+
+        {/* Notification Bell */}
+        <div className="px-4 pb-4">
+          <div className="bg-slate-800/50 rounded-xl p-2">
+            <NotificationBell />
+          </div>
+        </div>
 
       {/* User Info & Logout */}
       <div className="p-4 border-t border-slate-800">

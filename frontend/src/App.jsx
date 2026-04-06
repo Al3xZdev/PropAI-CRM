@@ -15,6 +15,7 @@ import PublicationResult from './components/PublicationResult'
 import ScheduleModal from './components/ScheduleModal'
 import CopywritingContent from './components/CopywritingContent'
 import ScheduleSuccessPopup from './components/ScheduleSuccessPopup'
+import { NotificationsProvider, useNotifications, NOTIFICATION_TYPES } from './hooks/useNotifications'
 import { 
   Sparkles, Building2, FileText, Calendar, Eye, 
   Plus, Loader2, X, Copy, Send, ArrowLeft
@@ -24,6 +25,7 @@ import {
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 function App() {
+  const { addNotification } = useNotifications()
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [properties, setProperties] = useState([])
   const [selectedProperty, setSelectedProperty] = useState(null)
@@ -362,8 +364,16 @@ function App() {
       
       if (isSuccess) {
         setResultStatus('success')
+        // Add notification for successful publication
+        addNotification(NOTIFICATION_TYPES.POST_PUBLISHED, {
+          platform: platform
+        })
       } else {
         setResultStatus('error')
+        // Add notification for publication error
+        addNotification(NOTIFICATION_TYPES.POST_ERROR, {
+          platform: platform
+        })
       }
     }, 2000)
   }
@@ -723,68 +733,85 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Sidebar */}
-      <Sidebar 
-        currentPage={currentPage} 
-        onNavigate={handleNavigate}
-        stats={{ leads: leadsStats, properties: properties.length }}
-        user={user}
-        onLogout={logout}
-      />
+    <NotificationsProvider>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        {/* Sidebar */}
+        <Sidebar 
+          currentPage={currentPage} 
+          onNavigate={handleNavigate}
+          stats={{ leads: leadsStats, properties: properties.length }}
+          user={user}
+          onLogout={logout}
+        />
 
-      {/* Main Content */}
-      <main className="ml-64 p-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 flex items-center justify-between">
-            <span><strong>Error:</strong> {error}</span>
-            <button onClick={() => setError(null)} className="hover:text-red-100">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        )}
+        {/* Main Content */}
+        <main className="ml-64 p-8">
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 flex items-center justify-between">
+              <span><strong>Error:</strong> {error}</span>
+              <button onClick={() => setError(null)} className="hover:text-red-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
 
-        {renderPage()}
-      </main>
-      
-      {/* Publication Result Popup (Global) */}
-      <PublicationResult
-        isOpen={showResult}
-        status={resultStatus}
-        platform={resultPlatform}
-        onClose={() => setShowResult(false)}
-      />
-      
-      {/* Schedule Modal for Manual Posts */}
-      <ScheduleModal
-        isOpen={showScheduleModal}
-        onClose={() => setShowScheduleModal(false)}
-        property={selectedProperty}
-        onScheduled={(newPost, dateInfo) => {
-          // Refresh schedule data
-          setSchedule(prev => prev ? {
-            ...prev,
-            posts: [...(prev.posts || []), newPost]
-          } : { posts: [newPost] })
-          setShowScheduleModal(false)
-          
-          // Show success popup
-          setScheduleSuccessData({
-            date: dateInfo?.date || new Date(newPost.scheduledDate).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }),
-            time: dateInfo?.time || new Date(newPost.scheduledDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-            platforms: newPost.platforms?.map(p => p.platform) || ['Instagram']
-          })
-          setShowScheduleSuccess(true)
-        }}
-      />
-      
-      {/* Schedule Success Popup */}
-      <ScheduleSuccessPopup
-        isOpen={showScheduleSuccess}
-        onClose={() => setShowScheduleSuccess(false)}
-        data={scheduleSuccessData}
-      />
-    </div>
+          {renderPage()}
+        </main>
+        
+        {/* Publication Result Popup (Global) */}
+        <PublicationResult
+          isOpen={showResult}
+          status={resultStatus}
+          platform={resultPlatform}
+          onClose={() => setShowResult(false)}
+        />
+        
+        {/* Schedule Modal for Manual Posts */}
+        <ScheduleModal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          property={selectedProperty}
+          onScheduled={(newPost, dateInfo) => {
+            // Refresh schedule data
+            setSchedule(prev => prev ? {
+              ...prev,
+              posts: [...(prev.posts || []), newPost]
+            } : { posts: [newPost] })
+            setShowScheduleModal(false)
+            
+            // Get platform and date info
+            const platforms = newPost.platforms?.map(p => p.platform) || ['Instagram']
+            const platform = platforms[0] || 'Instagram'
+            const formattedDate = dateInfo?.date || new Date(newPost.scheduledDate).toLocaleDateString('es-ES', { 
+              weekday: 'long', 
+              day: 'numeric', 
+              month: 'long' 
+            })
+            
+            // Add notification for scheduled post
+            addNotification(NOTIFICATION_TYPES.POST_SCHEDULED, {
+              platform: platform.charAt(0).toUpperCase() + platform.slice(1),
+              date: formattedDate
+            })
+            
+            // Show success popup
+            setScheduleSuccessData({
+              date: formattedDate,
+              time: dateInfo?.time || new Date(newPost.scheduledDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+              platforms: platforms
+            })
+            setShowScheduleSuccess(true)
+          }}
+        />
+        
+        {/* Schedule Success Popup */}
+        <ScheduleSuccessPopup
+          isOpen={showScheduleSuccess}
+          onClose={() => setShowScheduleSuccess(false)}
+          data={scheduleSuccessData}
+        />
+      </div>
+    </NotificationsProvider>
   )
 }
 

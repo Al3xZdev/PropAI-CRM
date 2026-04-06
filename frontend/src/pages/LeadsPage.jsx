@@ -6,6 +6,7 @@ import {
   Loader2, Send, Rocket, Check, Facebook, Bell, Sparkles,
   Upload, FileText, CheckCircle, AlertTriangle, Download
 } from 'lucide-react'
+import { useNotifications, NOTIFICATION_TYPES } from '../hooks/useNotifications'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -15,6 +16,7 @@ const getAuthHeaders = () => ({
 })
 
 const LeadsPage = ({ onSelectLead, properties = [] }) => {
+  const { addNotification } = useNotifications()
   const [leads, setLeads] = useState([])
   const [filteredLeads, setFilteredLeads] = useState([])
   const [loading, setLoading] = useState(true)
@@ -167,8 +169,14 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
       })
       
       if (response.ok) {
+        const data = await response.json()
         await loadLeads()
         setShowCreateModal(false)
+        // Add notification for new lead
+        addNotification(NOTIFICATION_TYPES.NEW_LEAD, {
+          name: formData.name,
+          source: formData.source || 'Manual'
+        })
       }
     } catch (err) {
       console.error('Error creating lead:', err)
@@ -1692,6 +1700,13 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
         setToastMessage('Estado actualizado correctamente')
         setToastType('success')
         setShowToast(true)
+        
+        // Add notification if lead responded
+        if (status === 'respondio') {
+          addNotification(NOTIFICATION_TYPES.LEAD_RESPONDED, {
+            name: lead.name
+          })
+        }
       }
     } catch (err) {
       console.error('Error updating status:', err)

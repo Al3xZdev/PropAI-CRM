@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PropAI - Pitch Deck</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-space { font-family: 'Space Grotesk', sans-serif; }
+        .slide { min-height: 100vh; }
+        .gradient-bg { background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #0F172A 100%); }
+        .card-gradient { background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%); }
+        .price-card:hover { transform: scale(1.02); }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="bg-slate-900">
+    <!-- SLIDE 1: TITLE -->
+    <section class="gradient-bg slide flex items-center justify-center p-8">
+        <div class="max-w-4xl text-center">
+            <div class="inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full mb-8">
+                <span class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+                <span class="text-cyan-400 text-sm font-medium">Marketing Inteligente para Inmobiliarias</span>
+            </div>
+            
+            <h1 class="text-5xl md:text-7xl font-bold text-white mb-6">
+                Multiplica tus ventas inmobiliarias con
+                <span class="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent"> marketing automatizado</span>
+            </h1>
+            
+            <p class="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
+                La única plataforma que genera contenido con IA, programa publicaciones automáticamente y gestiona tus leads en un solo lugar.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="#contacto" class="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-semibold text-lg hover:scale-105 transition shadow-lg shadow-cyan-500/25">
+                    💎 Agendar Demo
+                </a>
+                <span class="text-slate-400 self-center">desde $3,000 implementación</span>
+            </div>
+            
+            <div class="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
+                <div class="text-center">
+                    <div class="font-space text-4xl font-bold text-white">80%</div>
+                    <div class="text-slate-400 text-sm">menos tiempo en marketing</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-space text-4xl font-bold text-white">40%</div>
+                    <div class="text-slate-400 text-sm">más leads</div>
+                </div>
+                <div class="text-center">
+                    <div class="font-space text-4xl font-bold text-white">3x</div>
+                    <div class="text-slate-400 text-sm">ROI en 90 días</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 2: PROBLEM -->
+    <section class="bg-slate-900 slide flex items-center p-8">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">El Problema</h2>
+                <p class="text-xl text-slate-400">El marketing inmobiliario actual es ineficiente y consume tiempo valioso</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-8">
+                    <div class="text-5xl mb-4">⏱️</div>
+                    <h3 class="text-xl font-bold text-red-400 mb-3">3+ horas por propiedad</h3>
+                    <p class="text-slate-300">Crear descripciones, copies y diseñar publicaciones para cada propiedad consume casi medio día de trabajo.</p>
+                </div>
+                <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-8">
+                    <div class="text-5xl mb-4">📱</div>
+                    <h3 class="text-xl font-bold text-red-400 mb-3">Multiplicidad de plataformas</h3>
+                    <p class="text-slate-300">Instagram, Facebook, TikTok, Twitter, portales... cada uno requiere contenido diferente y tiempo de publicación.</p>
+                </div>
+                <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-8">
+                    <div class="text-5xl mb-4">😴</div>
+                    <h3 class="text-xl font-bold text-red-400 mb-3">Leads perdidos</h3>
+                    <p class="text-slate-300">Sin seguimiento automatizado, el 80% de los potenciales clientes se van con la competencia.</p>
+                </div>
+                <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-8">
+                    <div class="text-5xl mb-4">💸</div>
+                    <h3 class="text-xl font-bold text-red-400 mb-3">ROI negativo</h3>
+                    <p class="text-slate-300">Inviertes en marketing pero no sabes qué funciona porque no hay analytics claro.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 3: SOLUTION -->
+    <section class="gradient-bg slide flex items-center p-8">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">La Solución</h2>
+                <p class="text-xl text-slate-300">Todo tu marketing inmobiliario en una sola plataforma</p>
+            </div>
+            
+            <div class="grid md:grid-cols-4 gap-6">
+                <div class="card-gradient border border-white/10 rounded-2xl p-6 text-center">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">🤖</div>
+                    <h3 class="text-lg font-bold text-white mb-2">IA Generativa</h3>
+                    <p class="text-slate-400 text-sm">Descripciones, copies y emails en segundos</p>
+                </div>
+                <div class="card-gradient border border-white/10 rounded-2xl p-6 text-center">
+                    <div class="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">📅</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Auto-Publicación</h3>
+                    <p class="text-slate-400 text-sm">Programa y olvida en IG, FB, TikTok</p>
+                </div>
+                <div class="card-gradient border border-white/10 rounded-2xl p-6 text-center">
+                    <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">👥</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Gestión Leads</h3>
+                    <p class="text-slate-400 text-sm">Sequences automatizados</p>
+                </div>
+                <div class="card-gradient border border-white/10 rounded-2xl p-6 text-center">
+                    <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">📊</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Analytics</h3>
+                    <p class="text-slate-400 text-sm">Métricas reales de rendimiento</p>
+                </div>
+            </div>
+            
+            <div class="mt-12 bg-white/5 border border-white/10 rounded-2xl p-8">
+                <h3 class="text-2xl font-bold text-white text-center mb-8">📅 Cronograma Automático</h3>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <div class="bg-blue-500/20 border border-blue-500/40 rounded-xl px-6 py-4">
+                        <div class="text-blue-400 font-bold">Día 1</div>
+                        <div class="text-white">Fotos + Just Listed</div>
+                    </div>
+                    <div class="text-slate-500 text-2xl">→</div>
+                    <div class="bg-purple-500/20 border border-purple-500/40 rounded-xl px-6 py-4">
+                        <div class="text-purple-400 font-bold">Día 3</div>
+                        <div class="text-white">Video / Reel</div>
+                    </div>
+                    <div class="text-slate-500 text-2xl">→</div>
+                    <div class="bg-orange-500/20 border border-orange-500/40 rounded-xl px-6 py-4">
+                        <div class="text-orange-400 font-bold">Día 5</div>
+                        <div class="text-white">Open House</div>
+                    </div>
+                    <div class="text-slate-500 text-2xl">→</div>
+                    <div class="bg-emerald-500/20 border border-emerald-500/40 rounded-xl px-6 py-4">
+                        <div class="text-emerald-400 font-bold">Día 10</div>
+                        <div class="text-white">Price Update</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 4: FEATURES -->
+    <section class="bg-slate-800 slide flex items-center p-8">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Funcionalidades Completas</h2>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-slate-700/50 rounded-2xl p-8 border border-slate-600">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center text-2xl">📝</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-2">Generación de Contenido IA</h3>
+                            <ul class="text-slate-300 space-y-2">
+                                <li>✓ Descripciones para portales inmobiliarios</li>
+                                <li>✓ Copies optimizados para cada red social</li>
+                                <li>✓ Email marketing personalizado</li>
+                                <li>✓ Hashtags y keywords optimizados</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-2xl p-8 border border-slate-600">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-violet-500/20 rounded-xl flex items-center justify-center text-2xl">📅</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-2">Programación Inteligente</h3>
+                            <ul class="text-slate-300 space-y-2">
+                                <li>✓ Calendarización automática</li>
+                                <li>✓ Publicación en IG, FB, TikTok, X</li>
+                                <li>✓ Mejores horarios basados en analytics</li>
+                                <li>✓ Repost automático de contenido evergreen</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-2xl p-8 border border-slate-600">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center text-2xl">👥</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-2">Gestión de Leads</h3>
+                            <ul class="text-slate-300 space-y-2">
+                                <li>✓ Captura de leads desde múltiples fuentes</li>
+                                <li>✓ Sequences de follow-up automatizados</li>
+                                <li>✓ Scoring y calificación de leads</li>
+                                <li>✓ Notificaciones y recordatorios</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-2xl p-8 border border-slate-600">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center text-2xl">📊</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-2">Analytics & Reportes</h3>
+                            <ul class="text-slate-300 space-y-2">
+                                <li>✓ Dashboard en tiempo real</li>
+                                <li>✓ Métricas por plataforma</li>
+                                <li>✓ Reportes automáticos semanales</li>
+                                <li>✓ Predicciones con IA</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 5: COMPARISON -->
+    <section class="gradient-bg slide flex items-center p-8">
+        <div class="max-w-4xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Antes vs Después</h2>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-8">
+                    <h3 class="text-2xl font-bold text-red-400 mb-6 text-center">❌ Manualmente</h3>
+                    <div class="space-y-4 text-slate-300">
+                        <div class="flex justify-between border-b border-red-500/20 pb-2">
+                            <span>Tiempo por propiedad</span>
+                            <span class="text-red-400 font-bold">3 horas</span>
+                        </div>
+                        <div class="flex justify-between border-b border-red-500/20 pb-2">
+                            <span>Plataformas</span>
+                            <span class="text-red-400 font-bold">1-2</span>
+                        </div>
+                        <div class="flex justify-between border-b border-red-500/20 pb-2">
+                            <span>Descripciones únicas</span>
+                            <span class="text-red-400 font-bold">❌</span>
+                        </div>
+                        <div class="flex justify-between border-b border-red-500/20 pb-2">
+                            <span>Publicación automática</span>
+                            <span class="text-red-400 font-bold">❌</span>
+                        </div>
+                        <div class="flex justify-between border-b border-red-500/20 pb-2">
+                            <span>Follow-up leads</span>
+                            <span class="text-red-400 font-bold">❌</span>
+                        </div>
+                        <div class="flex justify-between border-b border-red-500/20 pb-2">
+                            <span>Analytics</span>
+                            <span class="text-red-400 font-bold">❌</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-8">
+                    <h3 class="text-2xl font-bold text-emerald-400 mb-6 text-center">✅ Con PropAI</h3>
+                    <div class="space-y-4 text-slate-300">
+                        <div class="flex justify-between border-b border-emerald-500/20 pb-2">
+                            <span>Tiempo por propiedad</span>
+                            <span class="text-emerald-400 font-bold">2 minutos</span>
+                        </div>
+                        <div class="flex justify-between border-b border-emerald-500/20 pb-2">
+                            <span>Plataformas</span>
+                            <span class="text-emerald-400 font-bold">5+</span>
+                        </div>
+                        <div class="flex justify-between border-b border-emerald-500/20 pb-2">
+                            <span>Descripciones únicas</span>
+                            <span class="text-emerald-400 font-bold">✅ IA</span>
+                        </div>
+                        <div class="flex justify-between border-b border-emerald-500/20 pb-2">
+                            <span>Publicación automática</span>
+                            <span class="text-emerald-400 font-bold">✅</span>
+                        </div>
+                        <div class="flex justify-between border-b border-emerald-500/20 pb-2">
+                            <span>Follow-up leads</span>
+                            <span class="text-emerald-400 font-bold">✅</span>
+                        </div>
+                        <div class="flex justify-between border-b border-emerald-500/20 pb-2">
+                            <span>Analytics</span>
+                            <span class="text-emerald-400 font-bold">✅</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-8 text-center">
+                <p class="text-2xl text-white font-bold">Ahorra <span class="text-cyan-400">20+ horas semanales</span> en marketing</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 6: COMPETITORS -->
+    <section class="bg-slate-800 slide flex items-center p-8">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">¿Por qué PropAI?</h2>
+                <p class="text-xl text-slate-400">Comparación con otras soluciones del mercado</p>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-center">
+                    <thead>
+                        <tr class="border-b border-slate-600">
+                            <th class="py-4 px-4 text-slate-400 text-left">Feature</th>
+                            <th class="py-4 px-4 text-cyan-400 font-bold">PropAI</th>
+                            <th class="py-4 px-4 text-slate-400">Buffer</th>
+                            <th class="py-4 px-4 text-slate-400">Hootsuite</th>
+                            <th class="py-4 px-4 text-slate-400">Agencia</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-white">
+                        <tr class="border-b border-slate-700">
+                            <td class="py-4 px-4 text-left">IA para generar contenido</td>
+                            <td class="py-4 px-4 text-emerald-400 font-bold">✅</td>
+                            <td class="py-4 px-4 text-red-400">❌</td>
+                            <td class="py-4 px-4 text-red-400">❌</td>
+                            <td class="py-4 px-4 text-red-400">❌</td>
+                        </tr>
+                        <tr class="border-b border-slate-700">
+                            <td class="py-4 px-4 text-left">Especializado en Real Estate</td>
+                            <td class="py-4 px-4 text-emerald-400 font-bold">✅</td>
+                            <td class="py-4 px-4 text-slate-400">❌</td>
+                            <td class="py-4 px-4 text-slate-400">❌</td>
+                            <td class="py-4 px-4 text-yellow-400">Parcial</td>
+                        </tr>
+                        <tr class="border-b border-slate-700">
+                            <td class="py-4 px-4 text-left">Gestión de Leads integrada</td>
+                            <td class="py-4 px-4 text-emerald-400 font-bold">✅</td>
+                            <td class="py-4 px-4 text-red-400">❌</td>
+                            <td class="py-4 px-4 text-yellow-400">Parcial</td>
+                            <td class="py-4 px-4 text-yellow-400">+$</td>
+                        </tr>
+                        <tr class="border-b border-slate-700">
+                            <td class="py-4 px-4 text-left">Cronograma automático</td>
+                            <td class="py-4 px-4 text-emerald-400 font-bold">✅</td>
+                            <td class="py-4 px-4 text-yellow-400">Básico</td>
+                            <td class="py-4 px-4 text-yellow-400">Básico</td>
+                            <td class="py-4 px-4 text-red-400">❌</td>
+                        </tr>
+                        <tr class="border-b border-slate-700">
+                            <td class="py-4 px-4 text-left">Pricing fijo sin sorpresa</td>
+                            <td class="py-4 px-4 text-emerald-400 font-bold">✅</td>
+                            <td class="py-4 px-4 text-yellow-400">$99+/mes</td>
+                            <td class="py-4 px-4 text-yellow-400">$99+/mes</td>
+                            <td class="py-4 px-4 text-red-400">$2000+/mes</td>
+                        </tr>
+                        <tr>
+                            <td class="py-4 px-4 text-left">En español</td>
+                            <td class="py-4 px-4 text-emerald-400 font-bold">✅</td>
+                            <td class="py-4 px-4 text-slate-400">❌</td>
+                            <td class="py-4 px-4 text-slate-400">❌</td>
+                            <td class="py-4 px-4 text-yellow-400">Parcial</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-8 p-6 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-center">
+                <p class="text-xl text-white">
+                    <span class="text-cyan-400 font-bold">PropAI</span> es la única solución todo-en-uno especializada en el mercado inmobiliario hispanohablante.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 7: SOCIAL PROOF -->
+    <section class="bg-slate-900 slide flex items-center p-8">
+        <div class="max-w-4xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Lo que dicen nuestros clientes</h2>
+            </div>
+            
+            <div class="bg-slate-800 rounded-2xl p-8 border border-slate-700 mb-8">
+                <p class="text-xl text-slate-300 italic mb-6">"Desde que usamos PropAI, nuestro tiempo en marketing se redujo en un 80% y los leads aumentaron un 40%. Es increíble cómo la IA simplifica todo nuestro trabajo diario."</p>
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl">MG</div>
+                    <div>
+                        <p class="text-white font-bold">María González</p>
+                        <p class="text-slate-400">Directora, Inmobiliaria Premium</p>
+                    </div>
+                    <div class="ml-auto text-yellow-400 text-2xl">⭐⭐⭐⭐⭐</div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-slate-800/50 rounded-xl p-4">
+                    <div class="font-space text-3xl font-bold text-cyan-400">80%</div>
+                    <div class="text-slate-400 text-sm">menos tiempo</div>
+                </div>
+                <div class="bg-slate-800/50 rounded-xl p-4">
+                    <div class="font-space text-3xl font-bold text-cyan-400">40%</div>
+                    <div class="text-slate-400 text-sm">más leads</div>
+                </div>
+                <div class="bg-slate-800/50 rounded-xl p-4">
+                    <div class="font-space text-3xl font-bold text-cyan-400">3x</div>
+                    <div class="text-slate-400 text-sm">ROI</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 8: CASE STUDY -->
+    <section class="gradient-bg slide flex items-center p-8">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Caso de Éxito</h2>
+                <p class="text-xl text-slate-300">Inmobiliaria "Casas del Valle" - México</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-white/5 border border-white/10 rounded-2xl p-8">
+                    <h3 class="text-xl font-bold text-white mb-4">📊 El Reto</h3>
+                    <ul class="text-slate-300 space-y-3">
+                        <li>• 15 agentes inmobiliarios</li>
+                        <li>• 30+ propiedades nuevas por mes</li>
+                        <li>• Marketing manual tomaba 25 horas/semana</li>
+                        <li>• Leads perdidos por falta de seguimiento</li>
+                        <li>•ROI de marketing no medible</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-8">
+                    <h3 class="text-xl font-bold text-cyan-400 mb-4">✅ Los Resultados</h3>
+                    <ul class="text-slate-300 space-y-3">
+                        <li class="flex justify-between">
+                            <span>Tiempo en marketing</span>
+                            <span class="text-emerald-400 font-bold">-85%</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span>Leads generados</span>
+                            <span class="text-emerald-400 font-bold">+45%</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span>Conversiones</span>
+                            <span class="text-emerald-400 font-bold">+30%</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span>Propiedades publicadas</span>
+                            <span class="text-emerald-400 font-bold">100%</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span>ROI del marketing</span>
+                            <span class="text-emerald-400 font-bold">3.5x</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-8 text-center p-6 bg-white/5 border border-white/10 rounded-xl">
+                <p class="text-2xl text-white">
+                    "En 3 meses recuperamos la inversión y ahora我们的 marketing es 100% medible y automatizado."
+                </p>
+                <p class="text-cyan-400 mt-2">- Carlos Mendoza, Director General</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 9: TEAM -->
+    <section class="bg-slate-800 slide flex items-center p-8">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Nuestro Equipo</h2>
+                <p class="text-xl text-slate-400">Expertos en tecnología y marketing inmobiliario</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-slate-700/50 rounded-2xl p-8 border border-slate-600 text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">A</div>
+                    <h3 class="text-xl font-bold text-white">Alejandro</h3>
+                    <p class="text-cyan-400 mb-2">CEO & Fundador</p>
+                    <p class="text-slate-400 text-sm">10+ años en PropTech. Ex-Director de marketing en 2 inmobiliarias grandes.</p>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-2xl p-8 border border-slate-600 text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-violet-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">S</div>
+                    <h3 class="text-xl font-bold text-white">Sofia</h3>
+                    <p class="text-cyan-400 mb-2">CTO</p>
+                    <p class="text-slate-400 text-sm">Ingeniera de software con experiencia en IA y APIs de redes sociales.</p>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-2xl p-8 border border-slate-600 text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">M</div>
+                    <h3 class="text-xl font-bold text-white">Matías</h3>
+                    <p class="text-cyan-400 mb-2">Head of Product</p>
+                    <p class="text-slate-400 text-sm">Especialista en UX/UI con conocimiento profundo del mercado inmobiliario.</p>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                <p class="text-slate-400">+ Equipo de desarrollo, soporte y atención al cliente</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 10: ROADMAP -->
+    <section class="gradient-bg slide flex items-center p-8">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Roadmap 2025</h2>
+                <p class="text-xl text-slate-300">Lo que viene</p>
+            </div>
+            
+            <div class="grid md:grid-cols-4 gap-4">
+                <div class="bg-slate-800/50 rounded-xl p-6 border border-slate-600">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-3 h-3 bg-cyan-400 rounded-full"></span>
+                        <span class="text-cyan-400 font-bold">Q1 2025</span>
+                    </div>
+                    <ul class="text-slate-300 space-y-2 text-sm">
+                        <li>✅ Landing page</li>
+                        <li>✅ Sistema de leads</li>
+                        <li>✅ Integración Instagram</li>
+                        <li>🔄 Integración Facebook</li>
+                        <li>🔄 Gemini AI</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-slate-800/50 rounded-xl p-6 border border-slate-600">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-3 h-3 bg-yellow-400 rounded-full"></span>
+                        <span class="text-yellow-400 font-bold">Q2 2025</span>
+                    </div>
+                    <ul class="text-slate-300 space-y-2 text-sm">
+                        <li>📅 Integración TikTok</li>
+                        <li>📅 Integración LinkedIn</li>
+                        <li>📅 Analytics avanzado</li>
+                        <li>📅 Multi-agente</li>
+                        <li>📅 App móvil</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-slate-800/50 rounded-xl p-6 border border-slate-600">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-3 h-3 bg-orange-400 rounded-full"></span>
+                        <span class="text-orange-400 font-bold">Q3 2025</span>
+                    </div>
+                    <ul class="text-slate-300 space-y-2 text-sm">
+                        <li>📅 Marketplace de templates</li>
+                        <li>📅 Integración MLS</li>
+                        <li>📅 API pública</li>
+                        <li>📅 Zapier/Make integration</li>
+                        <li>📅 WhatsApp Business</li>
+                    </ul>
+                </div>
+                
+                <div class="bg-slate-800/50 rounded-xl p-6 border border-slate-600">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-3 h-3 bg-emerald-400 rounded-full"></span>
+                        <span class="text-emerald-400 font-bold">Q4 2025</span>
+                    </div>
+                    <ul class="text-slate-300 space-y-2 text-sm">
+                        <li>📅 Expansión LatAm</li>
+                        <li>📅 Expansión España</li>
+                        <li>📅 Programa de partners</li>
+                        <li>📅 Enterprise features</li>
+                        <li>📅 AI avanzada (GPT-4)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 11: FAQ -->
+    <section class="bg-slate-800 slide flex items-center p-8">
+        <div class="max-w-4xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Preguntas Frecuentes</h2>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600">
+                    <h3 class="text-lg font-bold text-white mb-2">¿Cuánto tiempo tarda la implementación?</h3>
+                    <p class="text-slate-300">一般mente 5-7 días hábiles. Configuramos todo,subimos tus propiedades existentes y capacitamos a tu equipo.</p>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600">
+                    <h3 class="text-lg font-bold text-white mb-2">¿Necesito conocimientos técnicos?</h3>
+                    <p class="text-slate-300">No, noi! Nos encargamos de todo. Solo necesitas subir las fotos y datos de las propiedades. El resto lo hace la IA.</p>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600">
+                    <h3 class="text-lg font-bold text-white mb-2">¿Qué pasa si quiero cancelar?</h3>
+                    <p class="text-slate-300">Puedes cancelar en cualquier momento con 30 días de anticipación. No hay penalizaciones ni cláusulas ocultas.</p>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600">
+                    <h3 class="text-lg font-bold text-white mb-2">¿Las redes sociales se conectan directamente?</h3>
+                    <p class="text-slate-300">Sí, conectamos tus cuentas de Instagram, Facebook, TikTok y Twitter. Usammos las APIs oficiales de cada plataforma.</p>
+                </div>
+                
+                <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600">
+                    <h3 class="text-lg font-bold text-white mb-2">¿Ofrecen soporte en español?</h3>
+                    <p class="text-slate-300">¡Por supuesto! Todo nuestro soporte es en español, por email, chat y teléfono según tu plan.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 12: GUARANTEE -->
+    <section class="gradient-bg slide flex items-center p-8">
+        <div class="max-w-4xl mx-auto w-full text-center">
+            <div class="mb-8">
+                <div class="text-6xl mb-4">🛡️</div>
+                <h2 class="text-4xl font-bold text-white mb-4">Garantía de Satisfacción</h2>
+            </div>
+            
+            <div class="bg-white/5 border border-white/10 rounded-2xl p-8 mb-8">
+                <h3 class="text-2xl font-bold text-white mb-4">30 Días de Garantía</h3>
+                <p class="text-lg text-slate-300">
+                    Si en los primeros 30 días no estás satisfecho con los resultados, devolvemos tu dinero. Sin preguntas, sin complicaciones.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-slate-800/30 rounded-xl p-6">
+                    <div class="text-3xl mb-2">🔒</div>
+                    <p class="text-white font-bold">Datos Seguros</p>
+                    <p class="text-slate-400 text-sm">Encriptación SSL y GDPR compliant</p>
+                </div>
+                <div class="bg-slate-800/30 rounded-xl p-6">
+                    <div class="text-3xl mb-2">⚡</div>
+                    <p class="text-white font-bold">99.9% Uptime</p>
+                    <p class="text-slate-400 text-sm">Garantizado con redundancy</p>
+                </div>
+                <div class="bg-slate-800/30 rounded-xl p-6">
+                    <div class="text-3xl mb-2">🔄</div>
+                    <p class="text-white font-bold">Backups Diarios</p>
+                    <p class="text-slate-400 text-sm">Tus datos siempre seguros</p>
+                </div>
+            </div>
+            
+            <a href="#contacto" class="inline-block px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-semibold text-lg hover:scale-105 transition shadow-lg shadow-cyan-500/25">
+                📅 Agendar Demo sin Compromiso
+            </a>
+        </div>
+    </section>
+
+    <!-- SLIDE 13: PRICING -->
+    <section class="bg-slate-900 slide flex items-center p-8" id="precios">
+        <div class="max-w-6xl mx-auto w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white mb-4">Inversión</h2>
+                <p class="text-xl text-slate-300">Elige el plan que mejor se adapte a tus necesidades</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Starter -->
+                <div class="bg-white/5 border border-white/20 rounded-2xl p-8 price-card transition">
+                    <div class="text-center mb-6">
+                        <h3 class="text-2xl font-bold text-white">Starter</h3>
+                        <p class="text-slate-400">Para inmobiliarias pequeñas</p>
+                    </div>
+                    <div class="text-center mb-6">
+                        <div class="text-sm text-slate-400">Implementación</div>
+                        <div class="font-space text-4xl font-bold text-white">$1,500</div>
+                    </div>
+                    <div class="text-center mb-6">
+                        <div class="text-sm text-slate-400">Suscripción mensual</div>
+                        <div class="font-space text-3xl font-bold text-cyan-400">$199<span class="text-lg text-slate-400">/mes</span></div>
+                    </div>
+                    <ul class="text-slate-300 space-y-3 mb-8 text-sm">
+                        <li>✓ 25 propiedades/año</li>
+                        <li>✓ 1 usuario</li>
+                        <li>✓ 2 plataformas</li>
+                        <li>✓ 50 generaciones IA/mes</li>
+                        <li>✓ Email soporte</li>
+                        <li>✓ 1 hora capacitación</li>
+                        <li>✓ Analytics básico</li>
+                    </ul>
+                    <a href="#contacto" class="block text-center py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-semibold transition">
+                        Elegir Starter
+                    </a>
+                </div>
+                
+                <!-- Professional -->
+                <div class="bg-white/5 border border-white/20 rounded-2xl p-8 price-card transition">
+                    <div class="text-center mb-6">
+                        <h3 class="text-2xl font-bold text-white">Professional</h3>
+                        <p class="text-slate-400">Para inmobiliarias en crecimiento</p>
+                    </div>
+                    <div class="text-center mb-6">
+                        <div class="text-sm text-slate-400">Implementación</div>
+                        <div class="font-space text-4xl font-bold text-white">$3,000</div>
+                    </div>
+                    <div class="text-center mb-6">
+                        <div class="text-sm text-slate-400">Suscripción mensual</div>
+                        <div class="font-space text-3xl font-bold text-cyan-400">$349<span class="text-lg text-slate-400">/mes</span></div>
+                    </div>
+                    <ul class="text-slate-300 space-y-3 mb-8 text-sm">
+                        <li>✓ 100 propiedades/año</li>
+                        <li>✓ 5 usuarios</li>
+                        <li>✓ 5 plataformas</li>
+                        <li>✓ 200 generaciones IA/mes</li>
+                        <li>✓ Email + Chat soporte</li>
+                        <li>✓ 3 horas capacitación</li>
+                        <li>✓ Analytics avanzado</li>
+                    </ul>
+                    <a href="#contacto" class="block text-center py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition">
+                        Elegir Professional
+                    </a>
+                </div>
+                
+                <!-- Enterprise (Highlighted) -->
+                <div class="bg-gradient-to-b from-cyan-500/20 to-blue-500/20 border-2 border-cyan-500 rounded-2xl p-8 price-card transition transform scale-105">
+                    <div class="text-center mb-2">
+                        <span class="inline-block bg-cyan-500 text-white text-xs font-bold px-3 py-1 rounded-full">MÁS POPULAR</span>
+                    </div>
+                    <div class="text-center mb-6">
+                        <h3 class="text-2xl font-bold text-white">Enterprise</h3>
+                        <p class="text-slate-400">Para inmobiliarias grandes</p>
+                    </div>
+                    <div class="text-center mb-6">
+                        <div class="text-sm text-slate-400">Implementación</div>
+                        <div class="font-space text-4xl font-bold text-white">$5,000</div>
+                    </div>
+                    <div class="text-center mb-6">
+                        <div class="text-sm text-slate-400">Suscripción mensual</div>
+                        <div class="font-space text-3xl font-bold text-cyan-400">$499<span class="text-lg text-slate-400">/mes</span></div>
+                    </div>
+                    <ul class="text-slate-300 space-y-3 mb-8 text-sm">
+                        <li>✓ Propiedades ilimitadas</li>
+                        <li>✓ 20 usuarios</li>
+                        <li>✓ Todas las plataformas</li>
+                        <li>✓ IA ilimitada</li>
+                        <li>✓ Soporte priority 24/7</li>
+                        <li>✓ Capacitación ilimitada</li>
+                        <li>✓ Analytics completo</li>
+                        <li>✓ API access</li>
+                    </ul>
+                    <a href="#contacto" class="block text-center py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-xl font-semibold transition">
+                        Elegir Enterprise
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 14: CTA -->
+    <section class="bg-slate-950 slide flex items-center p-8" id="contacto">
+        <div class="max-w-3xl mx-auto w-full">
+            <div class="text-center mb-8">
+                <h2 class="text-4xl font-bold text-white mb-4">🚀 ¿Listo para transformar tu marketing?</h2>
+                <p class="text-xl text-slate-300">Agenda una demo personalizada sin compromiso</p>
+            </div>
+            
+            <form class="bg-white/10 backdrop-blur-md p-8 rounded-2xl border border-white/20">
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-white mb-2 font-medium">Nombre completo *</label>
+                        <input type="text" placeholder="Tu nombre" class="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400">
+                    </div>
+                    <div>
+                        <label class="block text-white mb-2 font-medium">Nombre de tu inmobiliaria *</label>
+                        <input type="text" placeholder="Tu empresa" class="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400">
+                    </div>
+                </div>
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-white mb-2 font-medium">Email profesional *</label>
+                        <input type="email" placeholder="tu@email.com" class="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400">
+                    </div>
+                    <div>
+                        <label class="block text-white mb-2 font-medium">Teléfono (WhatsApp)</label>
+                        <input type="tel" placeholder="+1 234 567 890" class="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400">
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-white mb-2 font-medium">¿Cuántas propiedades manejan al mes?</label>
+                    <select class="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white focus:outline-none focus:border-cyan-400">
+                        <option value="" class="text-slate-800">Selecciona...</option>
+                        <option value="1-5" class="text-slate-800">1-5 propiedades</option>
+                        <option value="6-20" class="text-slate-800">6-20 propiedades</option>
+                        <option value="21-50" class="text-slate-800">21-50 propiedades</option>
+                        <option value="50+" class="text-slate-800">50+ propiedades</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-semibold text-lg hover:scale-105 transition shadow-lg shadow-cyan-500/25">
+                    📅 Agendar Demo Personalizada
+                </button>
+                <p class="text-center text-slate-400 text-sm mt-4">* Nos pondremos en contacto contigo en las próximas 24h</p>
+            </form>
+            
+            <div class="mt-12 text-center">
+                <p class="text-slate-400">O escríbenos directamente:</p>
+                <p class="text-cyan-400 text-xl">hola@propai.com</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-950 py-8">
+        <div class="max-w-6xl mx-auto px-8 text-center">
+            <div class="flex items-center justify-center gap-2 mb-4">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center">
+                    <span class="text-white font-bold text-xl">P</span>
+                </div>
+                <span class="text-2xl font-bold text-white">PropAI</span>
+            </div>
+            <p class="text-slate-400">Marketing Inteligente para Inmobiliarias</p>
+            <p class="text-slate-500 text-sm mt-4">© 2025 PropAI. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+</body>
+</html>
