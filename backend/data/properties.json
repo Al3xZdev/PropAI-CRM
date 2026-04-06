@@ -1,0 +1,120 @@
+{
+  "d47f2e3c-a910-4e62-a9c4-68759704af26": {
+    "id": "d47f2e3c-a910-4e62-a9c4-68759704af26",
+    "title": "Casa en Venta - 4 Dorm. - Quincho - Amplio Jardín - San Jorge Village",
+    "address": "Los Polvorines, Los Polvorines, Malvinas Argentinas",
+    "price": 720000,
+    "area": 640,
+    "bedrooms": 6,
+    "bathrooms": 4,
+    "description": "Lindisima casa de estilo construida sobre amplio terreno interno arbolado .\r\nPB , hall de recepción , gran living con chimenea y grandes ventanales con medio punto que comunican con el exterior , comedor separado con conexión a\r\nhacia la cocina , la cocina posee barra desayunadora , con profusión de alacenas altas y bajas y placares de guardado, horno y anafafe empotrada y\r\nespacio para lavavajillas tambien posee espacio para comedor diario .Sala de estar donde se armó una sala de TV .Dormitorio en suite amplio o escritorio\r\n\r\nPA .tres dormitorios que comparten un baño completo y placares todos de madera .Master suite con vestidor y ante baño y sauna .Hall\r\nde distribución amplio donde se puede armar un multiespacio .Galeria .\r\nExterior :quincho con parrilla y portón automático y puerta ventana hacia el jardín , vestuario con baño , cuarto de servicio y lavandería totalmente\r\nindependiente.\r\nPileta climatizada revestida con venecitas y bordes atermicos.\r\nCalefacción por loza radiante .Equipo de aire acondicionado central en PB y equipo de split individuales en los dormitorios .\r\nAberturas de madera Alemanas y mosquiteros .",
+    "propertyType": "casa",
+    "features": [
+      "Jardín",
+      "Alberca",
+      "Estacionamiento",
+      "Acepta Mascotas",
+      "Amueblado"
+    ],
+    "yearBuilt": null,
+    "floors": 1,
+    "images": [
+      {
+        "id": "707b432a-2499-4c84-8bcf-4f77f96bd059",
+        "filename": "235369fb-21c8-441d-bf8c-413fc17c1625-2038583230.jpg",
+        "url": "/uploads/235369fb-21c8-441d-bf8c-413fc17c1625-2038583230.jpg",
+        "originalName": "2038583230.jpg"
+      },
+      {
+        "id": "385964fe-5fcc-486f-8787-7000294c2ed6",
+        "filename": "359c532e-57c3-412f-b163-ba77cc865458-2038583213.jpg",
+        "url": "/uploads/359c532e-57c3-412f-b163-ba77cc865458-2038583213.jpg",
+        "originalName": "2038583213.jpg"
+      },
+      {
+        "id": "d3fc5b69-c585-41bb-b7e0-3519eaf62b6e",
+        "filename": "f0caac1e-bdb4-40bf-b544-cb51ac23fc25-2038583349.jpg",
+        "url": "/uploads/f0caac1e-bdb4-40bf-b544-cb51ac23fc25-2038583349.jpg",
+        "originalName": "2038583349.jpg"
+      }
+    ],
+    "createdAt": "2026-04-04T19:50:21.063Z",
+    "status": "draft"
+  },
+  "7affce20-2b5e-4bab-9b6f-25d6d9e75fce": {
+    "id": "7affce20-2b5e-4bab-9b6f-25d6d9e75fce",
+    "title": " Casa en Alquiler en Barrio Las Liebres 3 Dorm + Vestidor + Escritorio/play + Pileta + Parrilla",
+    "address": "Avenida Patricias Argentinas 2009, Las Liebres, Garín",
+    "price": 530000,
+    "area": 900,
+    "bedrooms": 5,
+    "bathrooms": 2,
+    "description": "Muy linda casa estilo moderna en el Barrio Las Liebres.\r\nPB: Hall de ingreso. Amplio living comedor super luminoso con techos doble altura. Cocina con abundante lugar de guardado. Toilette y placard de recepción. Dos dormitorios amplios con placards y baño compartido con bañadera.\r\nPA: ante sala/playroom/escritorio. Suite principal con vestidor y baño con hidromasajes y ducha.\r\nExterior: Lavadero/ guardatuti. Baño de pileta. Gran galeria con gran parrilla. Pileta con solarium y deck con living.\r\nEl Barrio Las liebres cuenta con seguridad 24 hs entrada principal y de servicio. Restorán abierto todos los días de la semana con delivery, mini market, dos plazas para chicos. Gimnasio y clases de gimnasia. Canchas de pádel. Canchas de tenis. Cancha de Squosh. Cancha de fútbol de pasto y sintética",
+    "propertyType": "casa",
+    "features": [
+      "Jardín",
+      "Alberca",
+      "Estacionamiento",
+      "Acepta Mascotas",
+      "Amueblado"
+    ],
+    "yearBuilt": null,
+    "floors": 1,
+    "images": [
+      {
+        "id": "5f1bd643-44d3-4108-bf88-2d8537f57494",
+        "filename": "8ee2bfa0-05c5-49c4-a656-dd5582e3f2d8-2022891699.jpg",
+        "url": "/uploads/8ee2bfa0-05c5-49c4-a656-dd5582e3f2d8-2022891699.jpg",
+        "originalName": "2022891699.jpg"
+      },
+      {
+        "id": "5e09c07d-f954-46c9-91e7-ed9033a469f0",
+        "filename": "81247908-3883-437c-9c88-f3b8e2e958e4-2022891695.jpg",
+        "url": "/uploads/81247908-3883-437c-9c88-f3b8e2e958e4-2022891695.jpg",
+        "originalName": "2022891695.jpg"
+      },
+      {
+        "id": "6852e5b9-1c6e-4c20-95cd-ea7547e66364",
+        "filename": "00f9c607-16ff-4897-84c2-9c27a12d8b8a-2022891716.jpg",
+        "url": "/uploads/00f9c607-16ff-4897-84c2-9c27a12d8b8a-2022891716.jpg",
+        "originalName": "2022891716.jpg"
+      },
+      {
+        "id": "6659381b-1da1-4cf7-bec0-eb332b418bc9",
+        "filename": "9830b5b9-f897-46bc-b11d-7e4397eb9f13-2022891720.jpg",
+        "url": "/uploads/9830b5b9-f897-46bc-b11d-7e4397eb9f13-2022891720.jpg",
+        "originalName": "2022891720.jpg"
+      }
+    ],
+    "createdAt": "2026-04-04T20:38:58.728Z",
+    "status": "draft"
+  },
+  "52f5b322-5a8a-459d-8e42-8034a2011292": {
+    "id": "52f5b322-5a8a-459d-8e42-8034a2011292",
+    "title": "Casa en Venta - 5 Dorm. - Escritorio - Pileta - Barrio San Jorge Village",
+    "address": "los polvorines, buenos aires",
+    "price": 15000,
+    "area": 600,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "description": "Casa estilo clásico , desarrollada en dos plantas sobre gran lote parquizado en esquina de 1772m2,\r\n\r\nPB: Porche,Hall de recepción. con placard y toilette.Living con amplios ventanales y salida al jardín. Chimenea. Comedor. Escritorio o jardín de invierno con techo vidriado\r\n\r\ncon vistas al exterior que le brindan gran luminosidad al ambiente .Cocina con mesada de silestone muebles de madera de haya , isla central y , con espacio para comedor\r\n\r\ndiario, family room que se conecta con la cocina y con la galeria. Un dormitorio en suite. Dependencia de servicio con dormitorio en suite y cómodo lavadero. Garage con\r\n\r\nportón automático con capacidad para 2 autos.\r\n\r\nPA: Suite principal con vestidor y amplio baño con hidromasaje y box de ducha. Dos suites junio con placard. Gran playroom de 9X5 M2 con terraza, Baulera\r\n\r\nExterior: Jardín con riego por aspersión, sectorizado, Galería amplia con parrilla con mesada , bacha y barra .Pileta de natación de 9x5M con filtro y sistema de calefacción.\r\n\r\nCarpinteria en PVC con vidrios dobles termo panel, Calefacción central por piso radiante. Termotanque de 200l. Equipos de aire acondicionado en todos los ambientes ",
+    "propertyType": "departamento",
+    "features": [
+      "Gimnasio",
+      "Seguridad 24/7",
+      "Roof Garden"
+    ],
+    "yearBuilt": null,
+    "floors": 1,
+    "images": [
+      {
+        "id": "d6dd9627-40a9-4e97-8682-4c369796e550",
+        "filename": "4b94c8d2-e6a0-44de-83c3-8e2740f90ea9-2022891695.jpg",
+        "url": "/uploads/4b94c8d2-e6a0-44de-83c3-8e2740f90ea9-2022891695.jpg",
+        "originalName": "2022891695.jpg"
+      }
+    ],
+    "createdAt": "2026-04-05T01:45:52.801Z",
+    "status": "draft"
+  }
+}

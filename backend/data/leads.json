@@ -1,0 +1,592 @@
+{
+  "cdbce244-fdc0-411d-aa7c-bf994682b408": {
+    "id": "cdbce244-fdc0-411d-aa7c-bf994682b408",
+    "name": "María González",
+    "email": "maria.gonzalez@email.com",
+    "phone": "+52 55 1234 5678",
+    "channel": "whatsapp",
+    "status": "contactado",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa moderna en Lomas",
+    "source": "Instagram",
+    "notes": "Interesada en casas con jardín",
+    "createdAt": "2026-04-02T20:25:47.069Z",
+    "lastContact": "2026-04-06T06:28:19.538Z",
+    "followUps": [],
+    "statusHistory": [
+      {
+        "from": "contactado",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:28:11.896Z"
+      },
+      {
+        "from": "contactado",
+        "to": "respondio",
+        "changedAt": "2026-04-06T06:28:16.879Z"
+      },
+      {
+        "from": "respondio",
+        "to": "respondio",
+        "changedAt": "2026-04-06T06:28:17.002Z"
+      },
+      {
+        "from": "respondio",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:28:18.062Z"
+      },
+      {
+        "from": "contactado",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:28:18.115Z"
+      },
+      {
+        "from": "contactado",
+        "to": "nuevo",
+        "changedAt": "2026-04-06T06:28:19.089Z"
+      },
+      {
+        "from": "nuevo",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:28:19.538Z"
+      }
+    ],
+    "updatedAt": "2026-04-06T06:28:19.538Z"
+  },
+  "97467468-1a11-46c4-8506-113ed41644e3": {
+    "id": "97467468-1a11-46c4-8506-113ed41644e3",
+    "name": "Carlos Rodríguez",
+    "email": "carlos.rod@email.com",
+    "phone": "+52 55 9876 5432",
+    "channel": "email",
+    "status": "respondio",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Departamento en Polanco",
+    "source": "Formulario Web",
+    "notes": "Busca zona céntrica, presupuesto flexible",
+    "createdAt": "2026-03-30T20:25:47.069Z",
+    "lastContact": "2026-04-06T06:33:39.935Z",
+    "followUps": [
+      {
+        "day": 1,
+        "sentAt": "2026-03-31T20:25:47.069Z",
+        "channel": "email",
+        "message": "Primer contacto de bienvenida"
+      }
+    ],
+    "statusHistory": [
+      {
+        "from": "contactado",
+        "to": "respondio",
+        "changedAt": "2026-04-06T06:33:39.935Z"
+      }
+    ],
+    "updatedAt": "2026-04-06T06:33:39.935Z"
+  },
+  "076eee00-365a-47ec-81d8-09ad3a5ed94d": {
+    "id": "076eee00-365a-47ec-81d8-09ad3a5ed94d",
+    "name": "Ana Martínez",
+    "email": "ana.martinez@email.com",
+    "phone": "+52 55 5555 4444",
+    "channel": "formulario",
+    "status": "perdido",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa en Condesa",
+    "source": "Portal Inmobiliario",
+    "notes": "Muy interesada, quiere agendar visita",
+    "createdAt": "2026-03-27T20:25:47.069Z",
+    "lastContact": "2026-04-04T20:54:14.753Z",
+    "followUps": [
+      {
+        "day": 1,
+        "sentAt": "2026-03-28T20:25:47.069Z",
+        "channel": "email",
+        "message": "Información inicial enviada"
+      },
+      {
+        "day": 3,
+        "sentAt": "2026-03-30T20:25:47.069Z",
+        "channel": "whatsapp",
+        "message": "Seguimiento por WhatsApp"
+      },
+      {
+        "day": 7,
+        "sentAt": "2026-04-03T20:25:47.069Z",
+        "channel": "whatsapp",
+        "message": "Recordatorio de visita"
+      }
+    ]
+  },
+  "7bd6c3a4-d958-45ce-8bf4-6002cd67e323": {
+    "id": "7bd6c3a4-d958-45ce-8bf4-6002cd67e323",
+    "name": "Roberto Sánchez",
+    "email": "roberto.s@email.com",
+    "phone": "+52 55 7777 8888",
+    "channel": "whatsapp",
+    "status": "respondio",
+    "propertyInterest": "terreno",
+    "propertyId": null,
+    "propertyTitle": "Terreno en CDMX",
+    "source": "WhatsApp",
+    "notes": "Viene de recomendación de cliente",
+    "createdAt": "2026-04-03T20:25:47.069Z",
+    "lastContact": "2026-04-04T20:53:33.210Z",
+    "followUps": []
+  },
+  "2fc1d821-2375-447f-91e6-48a90dcb5833": {
+    "id": "2fc1d821-2375-447f-91e6-48a90dcb5833",
+    "name": "Laura Hernández",
+    "email": "laura.hernandez@email.com",
+    "phone": "+52 55 3333 2222",
+    "channel": "instagram",
+    "status": "contactado",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Penthouse en Santa Fe",
+    "source": "Instagram",
+    "notes": "Cliente de alto perfil, responder rápido",
+    "createdAt": "2026-04-01T20:25:47.069Z",
+    "lastContact": "2026-04-02T20:25:47.069Z",
+    "followUps": [
+      {
+        "day": 1,
+        "sentAt": "2026-04-02T20:25:47.069Z",
+        "channel": "email",
+        "message": "Detalles del penthouse enviados"
+      }
+    ]
+  },
+  "892ba838-778a-497d-98b0-a56e7fe3c47d": {
+    "id": "892ba838-778a-497d-98b0-a56e7fe3c47d",
+    "name": "Diego Ramírez",
+    "email": "diego.ram@email.com",
+    "phone": "+52 55 6666 5555",
+    "channel": "formulario",
+    "status": "respondio",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa en Coyoacán",
+    "source": "Formulario Web",
+    "notes": "Interesado en不开玩笑, ya visitó la propiedad",
+    "createdAt": "2026-03-23T20:25:47.069Z",
+    "lastContact": "2026-04-01T20:25:47.069Z",
+    "followUps": [
+      {
+        "day": 1,
+        "sentAt": "2026-03-24T20:25:47.069Z",
+        "channel": "email",
+        "message": "Bienvenida enviada"
+      },
+      {
+        "day": 3,
+        "sentAt": "2026-03-26T20:25:47.069Z",
+        "channel": "whatsapp",
+        "message": "Video de la propiedad"
+      },
+      {
+        "day": 7,
+        "sentAt": "2026-03-30T20:25:47.069Z",
+        "channel": "whatsapp",
+        "message": "Agendamos visita"
+      },
+      {
+        "day": 14,
+        "sentAt": "2026-04-01T20:25:47.069Z",
+        "channel": "email",
+        "message": "Post-visita: muchas gracias por venir"
+      }
+    ]
+  },
+  "65a5ad49-e378-4664-9ebc-ee22636dfa58": {
+    "id": "65a5ad49-e378-4664-9ebc-ee22636dfa58",
+    "name": "Patricia López",
+    "email": "patricia.l@email.com",
+    "phone": "+52 55 8888 9999",
+    "channel": "whatsapp",
+    "status": "respondio",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Departamento en Roma Norte",
+    "source": "WhatsApp",
+    "notes": "Primera vez compranding casa, necesita guía",
+    "createdAt": "2026-04-03T20:25:47.069Z",
+    "lastContact": "2026-04-06T06:19:11.008Z",
+    "followUps": [],
+    "statusHistory": [
+      {
+        "from": "contactado",
+        "to": "respondio",
+        "changedAt": "2026-04-06T06:19:11.008Z"
+      }
+    ],
+    "updatedAt": "2026-04-06T06:19:11.008Z"
+  },
+  "cb9fc716-fc97-4fd8-a61d-ca14b8eabeff": {
+    "id": "cb9fc716-fc97-4fd8-a61d-ca14b8eabeff",
+    "name": "Fernando Torres",
+    "email": "fernando.torres@email.com",
+    "phone": "+52 55 1111 2222",
+    "channel": "email",
+    "status": "contactado",
+    "propertyInterest": "local",
+    "propertyId": null,
+    "propertyTitle": "Local comercial en Insurgentes",
+    "source": "Email",
+    "notes": "Busca local para restaurante",
+    "createdAt": "2026-03-31T20:25:47.069Z",
+    "lastContact": "2026-04-06T06:39:06.402Z",
+    "followUps": [
+      {
+        "day": 1,
+        "sentAt": "2026-04-01T20:25:47.069Z",
+        "channel": "email",
+        "message": "Información del local enviada"
+      }
+    ],
+    "statusHistory": [
+      {
+        "from": "contactado",
+        "to": "respondio",
+        "changedAt": "2026-04-06T06:39:02.113Z"
+      },
+      {
+        "from": "respondio",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:39:03.808Z"
+      },
+      {
+        "from": "contactado",
+        "to": "nuevo",
+        "changedAt": "2026-04-06T06:39:04.491Z"
+      },
+      {
+        "from": "nuevo",
+        "to": "perdido",
+        "changedAt": "2026-04-06T06:39:05.576Z"
+      },
+      {
+        "from": "perdido",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:39:06.402Z"
+      }
+    ],
+    "updatedAt": "2026-04-06T06:39:06.402Z"
+  },
+  "b3f0758d-9e75-49af-a440-39f3312ab0ce": {
+    "id": "b3f0758d-9e75-49af-a440-39f3312ab0ce",
+    "name": "Carmen Rivera",
+    "email": "carmen.rivera@email.com",
+    "phone": "+52 55 4444 3333",
+    "channel": "instagram",
+    "status": "respondio",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa en San Ángel",
+    "source": "Instagram",
+    "notes": "Muy interessada en la ubicación",
+    "createdAt": "2026-03-25T20:25:47.069Z",
+    "lastContact": "2026-04-02T20:25:47.069Z",
+    "followUps": [
+      {
+        "day": 1,
+        "sentAt": "2026-03-26T20:25:47.069Z",
+        "channel": "email",
+        "message": "Bienvenida"
+      },
+      {
+        "day": 3,
+        "sentAt": "2026-03-28T20:25:47.069Z",
+        "channel": "whatsapp",
+        "message": "Galería de fotos"
+      },
+      {
+        "day": 7,
+        "sentAt": "2026-04-01T20:25:47.069Z",
+        "channel": "whatsapp",
+        "message": "Video tour"
+      },
+      {
+        "day": 14,
+        "sentAt": "2026-04-02T20:25:47.069Z",
+        "channel": "email",
+        "message": "Oferta especial"
+      }
+    ]
+  },
+  "202c87b9-43fc-4358-aed9-8bef4e66b20b": {
+    "id": "202c87b9-43fc-4358-aed9-8bef4e66b20b",
+    "name": "ian martini",
+    "email": "ian@gmail.com",
+    "phone": "+54112657849",
+    "channel": "formulario",
+    "status": "respondio",
+    "propertyInterest": "departamento",
+    "propertyId": "d47f2e3c-a910-4e62-a9c4-68759704af26",
+    "propertyTitle": "Casa en Venta - 4 Dorm. - Quincho - Amplio Jardín - San Jorge Village",
+    "source": "landing page",
+    "notes": "",
+    "createdAt": "2026-04-06T06:40:45.276Z",
+    "lastContact": "2026-04-06T06:52:27.961Z",
+    "followUps": [],
+    "statusHistory": [
+      {
+        "from": "nuevo",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:52:21.150Z"
+      },
+      {
+        "from": "contactado",
+        "to": "contactado",
+        "changedAt": "2026-04-06T06:52:21.191Z"
+      },
+      {
+        "from": "contactado",
+        "to": "respondio",
+        "changedAt": "2026-04-06T06:52:27.961Z"
+      }
+    ],
+    "updatedAt": "2026-04-06T06:52:27.961Z"
+  },
+  "2e226392-c72e-401d-8481-cfa2dbeae6f6": {
+    "id": "2e226392-c72e-401d-8481-cfa2dbeae6f6",
+    "name": "María González",
+    "email": "maria.gonzalez@email.com",
+    "phone": "+52 55 1234 5678",
+    "channel": "whatsapp",
+    "status": "nuevo",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa moderna en Lomas",
+    "source": "Instagram",
+    "notes": "Interesada en casas con jardín",
+    "createdAt": "2026-04-06T06:53:39.890Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "9a6d14fe-cf40-4971-a96c-2842f4c33555": {
+    "id": "9a6d14fe-cf40-4971-a96c-2842f4c33555",
+    "name": "Carlos Rodríguez",
+    "email": "carlos.rod@email.com",
+    "phone": "+52 55 9876 5432",
+    "channel": "email",
+    "status": "nuevo",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Departamento en Polanco",
+    "source": "Formulario Web",
+    "notes": "Busca zona céntrica",
+    "createdAt": "2026-04-06T06:53:39.892Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "531256f5-64e4-4ad2-b76b-f49d320c2579": {
+    "id": "531256f5-64e4-4ad2-b76b-f49d320c2579",
+    "name": "Ana Martínez",
+    "email": "ana.martinez@email.com",
+    "phone": "+52 55 5555 4444",
+    "channel": "formulario",
+    "status": "nuevo",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa en Condesa",
+    "source": "Portal Inmobiliario",
+    "notes": "Muy interesada",
+    "createdAt": "2026-04-06T06:53:39.893Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "f0829117-68fa-4f4b-b146-38711c4bd7ea": {
+    "id": "f0829117-68fa-4f4b-b146-38711c4bd7ea",
+    "name": "Roberto Sánchez",
+    "email": "roberto.s@email.com",
+    "phone": "+52 55 7777 8888",
+    "channel": "whatsapp",
+    "status": "nuevo",
+    "propertyInterest": "terreno",
+    "propertyId": null,
+    "propertyTitle": "Terreno en CDMX",
+    "source": "WhatsApp",
+    "notes": "Viene de recomendación",
+    "createdAt": "2026-04-06T06:53:39.894Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "9cfcf9f2-d267-4c11-9ba4-870acaf72b91": {
+    "id": "9cfcf9f2-d267-4c11-9ba4-870acaf72b91",
+    "name": "Laura Hernández",
+    "email": "laura.hernandez@email.com",
+    "phone": "+52 55 3333 2222",
+    "channel": "instagram",
+    "status": "nuevo",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Penthouse en Santa Fe",
+    "source": "Instagram",
+    "notes": "Cliente de alto perfil",
+    "createdAt": "2026-04-06T06:53:39.896Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "03b59cca-0387-452f-9692-37f66e25032b": {
+    "id": "03b59cca-0387-452f-9692-37f66e25032b",
+    "name": "Diego Ramírez",
+    "email": "diego.ram@email.com",
+    "phone": "+52 55 6666 5555",
+    "channel": "formulario",
+    "status": "nuevo",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa en Coyoacán",
+    "source": "Formulario Web",
+    "notes": "Ya visitó el lugar",
+    "createdAt": "2026-04-06T06:53:39.897Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "6fa0d9ac-2258-4130-99ff-4bc61d683991": {
+    "id": "6fa0d9ac-2258-4130-99ff-4bc61d683991",
+    "name": "Patricia López",
+    "email": "patricia.l@email.com",
+    "phone": "+52 55 8888 9999",
+    "channel": "whatsapp",
+    "status": "nuevo",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Departamento en Roma Norte",
+    "source": "WhatsApp",
+    "notes": "Primera vez comprando",
+    "createdAt": "2026-04-06T06:53:39.898Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "af3fbc0d-6751-4821-8dce-0b88dc1be24b": {
+    "id": "af3fbc0d-6751-4821-8dce-0b88dc1be24b",
+    "name": "Fernando Torres",
+    "email": "fernando.torres@email.com",
+    "phone": "+52 55 1111 2222",
+    "channel": "email",
+    "status": "nuevo",
+    "propertyInterest": "local",
+    "propertyId": null,
+    "propertyTitle": "Local comercial en Insurgentes",
+    "source": "Email",
+    "notes": "Busca local para restaurante",
+    "createdAt": "2026-04-06T06:53:39.899Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "b7d32ad3-b3bf-4928-a64c-f4a56da836eb": {
+    "id": "b7d32ad3-b3bf-4928-a64c-f4a56da836eb",
+    "name": "Carmen Rivera",
+    "email": "carmen.rivera@email.com",
+    "phone": "+52 55 4444 3333",
+    "channel": "instagram",
+    "status": "nuevo",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa en San Ángel",
+    "source": "Instagram",
+    "notes": "Muy interesada en ubicación",
+    "createdAt": "2026-04-06T06:53:39.900Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "fe2123d8-73f1-4e24-9000-ff70efbb7649": {
+    "id": "fe2123d8-73f1-4e24-9000-ff70efbb7649",
+    "name": "José Luis Moreno",
+    "email": "jose.moreno@email.com",
+    "phone": "+52 55 2222 3333",
+    "channel": "whatsapp",
+    "status": "nuevo",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Departamento en Juárez",
+    "source": "Facebook",
+    "notes": "Presupuesto flexible",
+    "createdAt": "2026-04-06T06:53:39.901Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "d976b7fa-5bd8-4ae2-83ce-059b5d7b5da7": {
+    "id": "d976b7fa-5bd8-4ae2-83ce-059b5d7b5da7",
+    "name": "Gabriela Flores",
+    "email": "gabriela.flores@email.com",
+    "phone": "+52 55 4444 5555",
+    "channel": "email",
+    "status": "nuevo",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Villa en Tlalpan",
+    "source": "Referido",
+    "notes": "Conocida del agente",
+    "createdAt": "2026-04-06T06:53:39.903Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "635e3980-8f96-4dd4-ae6c-a9e2d3c9d60a": {
+    "id": "635e3980-8f96-4dd4-ae6c-a9e2d3c9d60a",
+    "name": "Miguel Ángel Cruz",
+    "email": "miguel.cruz@email.com",
+    "phone": "+52 55 6666 7777",
+    "channel": "formulario",
+    "status": "nuevo",
+    "propertyInterest": "terreno",
+    "propertyId": null,
+    "propertyTitle": "Terreno en Huixquilucan",
+    "source": "Web",
+    "notes": "Quisiera construir",
+    "createdAt": "2026-04-06T06:53:39.904Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "1f52c7ee-7ace-47bc-afe4-77437f3b76b2": {
+    "id": "1f52c7ee-7ace-47bc-afe4-77437f3b76b2",
+    "name": "Sofía Ramírez",
+    "email": "sofia.ramirez@email.com",
+    "phone": "+52 55 8888 9999",
+    "channel": "instagram",
+    "status": "nuevo",
+    "propertyInterest": "departamento",
+    "propertyId": null,
+    "propertyTitle": "Loft en Roma",
+    "source": "Instagram",
+    "notes": "Diseñadora de interiores",
+    "createdAt": "2026-04-06T06:53:39.905Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "b253a8a7-f569-441f-9795-d70f142cf2c5": {
+    "id": "b253a8a7-f569-441f-9795-d70f142cf2c5",
+    "name": "Ricardo Vega",
+    "email": "ricardo.vega@email.com",
+    "phone": "+52 55 1111 3333",
+    "channel": "whatsapp",
+    "status": "nuevo",
+    "propertyInterest": "casa",
+    "propertyId": null,
+    "propertyTitle": "Casa en Alpes",
+    "source": "WhatsApp",
+    "notes": "Inversionista",
+    "createdAt": "2026-04-06T06:53:39.906Z",
+    "lastContact": null,
+    "followUps": []
+  },
+  "f356b3ed-ca5f-4604-87ce-059995be687b": {
+    "id": "f356b3ed-ca5f-4604-87ce-059995be687b",
+    "name": "Lucía Torres",
+    "email": "lucia.torres@email.com",
+    "phone": "+52 55 5555 6666",
+    "channel": "email",
+    "status": "nuevo",
+    "propertyInterest": "oficina",
+    "propertyId": null,
+    "propertyTitle": "Oficina en Santa Fe",
+    "source": "LinkedIn",
+    "notes": "Para empresa nueva",
+    "createdAt": "2026-04-06T06:53:39.907Z",
+    "lastContact": null,
+    "followUps": []
+  }
+}
