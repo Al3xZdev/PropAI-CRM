@@ -4,9 +4,14 @@ import {
   Instagram, Globe, ChevronRight, Clock, CheckCircle2,
   AlertCircle, MoreVertical, Trash2, Eye, X, ArrowRight,
   Loader2, Send, Rocket, Check, Facebook, Bell, Sparkles,
-  Upload, FileText, CheckCircle, AlertTriangle, Download
+  Upload, FileText, CheckCircle as CheckCircleIcon, AlertTriangle, Download,
+  ArrowUpDown, LayoutGrid, List, Pause, Play, Zap, MessageSquare,
+  Calendar, CheckCheck
 } from 'lucide-react'
 import { useNotifications, NOTIFICATION_TYPES } from '../hooks/useNotifications'
+import ChatModal from '../components/ChatModal'
+import GenerateContractModal from '../components/GenerateContractModal'
+import LeadContractsHistory from '../components/contracts/LeadContractsHistory'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -31,14 +36,38 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [creatingLead, setCreatingLead] = useState(false)
+  
+  // Automation state - sequences and which leads are in them
+  const [sequences, setSequences] = useState([])
+  const [leadsInSequences, setLeadsInSequences] = useState({})
+  
+  // Selection state
+  const [selectionMode, setSelectionMode] = useState(false) // Only active when user clicks "Eliminar"
+  const [selectedLeads, setSelectedLeads] = useState(new Set())
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingLeads, setDeletingLeads] = useState(false)
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false)
+  const [deletedCount, setDeletedCount] = useState(0)
+
+  // Sort and View state
+  const [sortBy, setSortBy] = useState('newest') // newest, oldest, az, za
+  const [viewMode, setViewMode] = useState('list') // list, kanban
 
   useEffect(() => {
     loadLeads()
+    loadSequencesData()
   }, [])
 
   useEffect(() => {
     filterLeads()
-  }, [leads, searchTerm, filters])
+  }, [leads, searchTerm, filters, sortBy])
+
+  // Clear selection when filters change or exiting selection mode
+  useEffect(() => {
+    if (!selectionMode) {
+      setSelectedLeads(new Set())
+    }
+  }, [filters, searchTerm, selectionMode])
 
   const loadLeads = async () => {
     try {
@@ -52,6 +81,85 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Load sequences and leads in sequences
+  const loadSequencesData = async () => {
+    try {
+      // Get all sequences
+      const seqRes = await fetch(`${API_URL}/automation/sequences`, { headers: getAuthHeaders() })
+      if (seqRes.ok) {
+        const seqData = await seqRes.json()
+        setSequences(seqData.sequences || [])
+      }
+      
+      // Get leads in each sequence
+      const leadsInSeqData = {}
+      for (const seq of sequences) {
+        try {
+          const res = await fetch(`${API_URL}/automation/sequences/${seq.id}/leads`, { headers: getAuthHeaders() })
+          if (res.ok) {
+            const data = await res.json()
+            leadsInSeqData[seq.id] = data.leadIds || []
+          }
+        } catch (e) {
+          console.error('Error fetching leads for sequence:', e)
+        }
+      }
+      setLeadsInSequences(leadsInSeqData)
+    } catch (err) {
+      console.error('Error loading sequences data:', err)
+    }
+  }
+
+  // Get sequence name for a specific lead
+  const getLeadSequenceName = (leadId) => {
+    for (const [seqId, leadIds] of Object.entries(leadsInSequences)) {
+      if (leadIds.includes(leadId)) {
+        const seq = sequences.find(s => s.id === seqId)
+        return seq?.name || 'Secuencia'
+      }
+    }
+    return null
+  }
+
+  // Get sequence ID for a specific lead
+  const getLeadSequenceId = (leadId) => {
+    for (const [seqId, leadIds] of Object.entries(leadsInSequences)) {
+      if (leadIds.includes(leadId)) {
+        return seqId
+      }
+    }
+    return null
+  }
+
+  // Remove lead from sequence
+  const removeLeadFromSequence = async (leadId) => {
+    const sequenceId = getLeadSequenceId(leadId)
+    if (!sequenceId) return false
+    
+    try {
+      const response = await fetch(`${API_URL}/automation/sequences/${sequenceId}/leads/${leadId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      })
+      
+      if (response.ok) {
+        // Also stop automation for this lead
+        await fetch(`${API_URL}/leads/${leadId}/automation/stop`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        })
+        
+        // Reload data
+        await loadLeads()
+        await loadSequencesData()
+        return true
+      }
+    } catch (err) {
+      console.error('Error removing lead from sequence:', err)
+    }
+    return false
   }
 
   const filterLeads = () => {
@@ -77,7 +185,77 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
       filtered = filtered.filter(l => l.propertyInterest === filters.propertyInterest)
     }
     
+    // Sort leads
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.createdAt) - new Date(a.createdAt)
+        case 'oldest':
+          return new Date(a.createdAt) - new Date(b.createdAt)
+        case 'az':
+          return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+        case 'za':
+          return b.name.localeCompare(a.name, 'es', { sensitivity: 'base' })
+        default:
+          return 0
+      }
+    })
+    
     setFilteredLeads(filtered)
+  }
+
+  // Selection functions
+  const toggleSelectLead = (leadId) => {
+    setSelectedLeads(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId)
+      } else {
+        newSet.add(leadId)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedLeads.size === filteredLeads.length) {
+      setSelectedLeads(new Set())
+    } else {
+      setSelectedLeads(new Set(filteredLeads.map(l => l.id)))
+    }
+  }
+
+  const deleteSelectedLeads = async () => {
+    setDeletingLeads(true)
+    let deleted = 0
+    
+    try {
+      for (const leadId of selectedLeads) {
+        const response = await fetch(`${API_URL}/leads/${leadId}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        })
+        if (response.ok) {
+          deleted++
+        }
+      }
+      
+      setDeletedCount(deleted)
+      setShowDeleteConfirm(false)
+      setShowDeleteSuccess(true)
+      setSelectedLeads(new Set())
+      await loadLeads()
+      
+      // Auto close success popup after 2.5 seconds
+      setTimeout(() => {
+        setShowDeleteSuccess(false)
+      }, 2500)
+      
+    } catch (err) {
+      console.error('Error deleting leads:', err)
+    } finally {
+      setDeletingLeads(false)
+    }
   }
 
   const getChannelIcon = (channel) => {
@@ -105,6 +283,8 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
       nuevo: { icon: AlertCircle, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: 'Nuevo' },
       contactado: { icon: Clock, color: 'bg-amber-500/20 text-amber-400 border-amber-500/30', label: 'Contactado' },
       respondio: { icon: CheckCircle2, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Respondió' },
+      visita_agendada: { icon: Calendar, color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', label: 'Visita Agendada' },
+      cerrado: { icon: CheckCheck, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Cerrado' },
       perdido: { icon: X, color: 'bg-red-500/20 text-red-400 border-red-500/30', label: 'Perdido' }
     }
     return badges[status] || badges.nuevo
@@ -135,9 +315,9 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
     if (lead.statusHistory && lead.statusHistory.length > 0) {
       const last = lead.statusHistory[lead.statusHistory.length - 1]
       return {
-        from: last.from,
-        to: last.to,
-        changedAt: last.changedAt
+        from: last.previousStatus,
+        to: last.newStatus,
+        changedAt: last.createdAt
       }
     }
     return null
@@ -148,9 +328,13 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
       nuevo: 'Nuevo',
       contactado: 'Contactado',
       respondio: 'Respondió',
+      visita_agendada: 'Visita Agendada',
+      cerrado: 'Cerrado',
       perdido: 'Perdido'
     }
-    return `${labels[from] || from} → ${labels[to] || to}`
+    const fromLabel = from ? (labels[from] || from) : 'Nuevo'
+    const toLabel = to ? (labels[to] || to) : to
+    return `${fromLabel} → ${toLabel}`
   }
 
   const openLeadDetail = (lead) => {
@@ -192,9 +376,47 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">Leads</h1>
-          <p className="text-slate-400 mt-1">{filteredLeads.length} leads encontrados</p>
+          <p className="text-slate-400 mt-1">
+            {selectionMode && selectedLeads.size > 0
+              ? `${selectedLeads.size} de ${filteredLeads.length} seleccionados`
+              : `${filteredLeads.length} leads encontrados`
+            }
+          </p>
         </div>
         <div className="flex gap-3">
+          {selectionMode ? (
+            <>
+              {/* Cancel selection mode */}
+              <button 
+                onClick={() => {
+                  setSelectionMode(false)
+                  setSelectedLeads(new Set())
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded-xl text-white font-medium transition-colors"
+              >
+                <X className="w-5 h-5" />
+                Cancelar
+              </button>
+              {/* Delete selected */}
+              {selectedLeads.size > 0 && (
+                <button 
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-xl text-white font-medium transition-colors animate-fade-in"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Eliminar ({selectedLeads.size})
+                </button>
+              )}
+            </>
+          ) : (
+            <button 
+              onClick={() => setSelectionMode(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded-xl text-white font-medium transition-colors"
+            >
+              <Trash2 className="w-5 h-5" />
+              Eliminar
+            </button>
+          )}
           <button 
             onClick={() => setShowImportModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-medium transition-colors"
@@ -274,11 +496,41 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
                 <X className="w-5 h-5" />
               </button>
             )}
+            
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white focus:border-blue-500 outline-none"
+            >
+              <option value="newest">Más nuevo</option>
+              <option value="oldest">Más viejo</option>
+              <option value="az">Nombre A-Z</option>
+              <option value="za">Nombre Z-A</option>
+            </select>
+
+            {/* View Toggle */}
+            <div className="flex bg-slate-700/50 border border-slate-600 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-3 transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Vista lista"
+              >
+                <List className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-3 transition-colors ${viewMode === 'kanban' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                title="Vista Kanban"
+              >
+                <LayoutGrid className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Leads List */}
+      {/* Leads List / Kanban */}
       {loading ? (
         <div className="text-center py-12 text-slate-500">Cargando leads...</div>
       ) : filteredLeads.length === 0 ? (
@@ -286,20 +538,80 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
           <Users className="w-16 h-16 mx-auto mb-4 text-slate-600" />
           <p className="text-slate-400">No hay leads que coincidan con los filtros</p>
         </div>
-      ) : (
+      ) : viewMode === 'kanban' ? null : ( // Kanban is rendered below, so don't render list here
         <div className="space-y-3">
+          {/* Select All Header - only in selection mode */}
+          {selectionMode && (
+            <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/30 rounded-xl border border-slate-700/50 animate-fade-in">
+              <button
+                onClick={toggleSelectAll}
+                className={`
+                  w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                  ${selectedLeads.size === filteredLeads.length && filteredLeads.length > 0
+                    ? 'bg-blue-600 border-blue-600'
+                    : 'border-slate-600 hover:border-slate-500'
+                  }
+                `}
+              >
+                {selectedLeads.size === filteredLeads.length && filteredLeads.length > 0 && (
+                  <Check className="w-3 h-3 text-white" />
+                )}
+              </button>
+              <span className="text-slate-400 text-sm">
+                {selectedLeads.size === filteredLeads.length 
+                  ? 'Deseleccionar todos' 
+                  : 'Seleccionar todos'
+                }
+              </span>
+            </div>
+          )}
+
           {filteredLeads.map(lead => {
             const statusBadge = getStatusBadge(lead.status)
             const StatusIcon = statusBadge.icon
             const lastChange = getLastStatusChange(lead)
+            const isSelected = selectedLeads.has(lead.id)
             
             return (
               <div
                 key={lead.id}
-                onClick={() => openLeadDetail(lead)}
-                className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700 hover:border-slate-600 transition-all cursor-pointer group"
+                onClick={() => {
+                  if (selectionMode) {
+                    toggleSelectLead(lead.id)
+                  } else {
+                    openLeadDetail(lead)
+                  }
+                }}
+                className={`
+                  bg-slate-800/50 rounded-2xl p-5 border transition-all cursor-pointer group
+                  ${isSelected 
+                    ? 'border-blue-500/50 bg-blue-500/5' 
+                    : 'border-slate-700 hover:border-slate-600'
+                  }
+                `}
               >
                 <div className="flex items-center gap-4">
+                  {/* Checkbox - only in selection mode */}
+                  {selectionMode ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleSelectLead(lead.id)
+                      }}
+                      className={`
+                        w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0
+                        ${isSelected
+                          ? 'bg-blue-600 border-blue-600'
+                          : 'border-slate-600 hover:border-blue-500'
+                        }
+                      `}
+                    >
+                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                    </button>
+                  ) : (
+                    <div className="w-5 h-5 flex-shrink-0" />
+                  )}
+
                   {/* Avatar */}
                   <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-violet-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
                     {lead.name.charAt(0)}
@@ -332,14 +644,20 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
                   {/* Property Interest */}
                   <div className="hidden md:block text-right">
                     <p className="text-sm text-slate-400">Interesado en</p>
-                    <p className="text-white font-medium capitalize">{lead.propertyInterest}</p>
-                    {lead.propertyTitle && (
-                      <p className="text-xs text-slate-500 truncate max-w-[150px]">{lead.propertyTitle}</p>
+                    {lead.propertyInterest ? (
+                      <>
+                        <p className="text-white font-medium capitalize">{lead.propertyInterest}</p>
+                        {lead.propertyTitle && (
+                          <p className="text-xs text-slate-500 truncate max-w-[150px]">{lead.propertyTitle}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-slate-500 text-sm">No especificado</p>
                     )}
                   </div>
 
-                  {/* Date & Status Change */}
-                  <div className="text-right">
+                    {/* Date & Status Change */}
+                  <div className="text-right hidden sm:block">
                     <p className="text-sm text-slate-400">{formatDate(lead.createdAt)}</p>
                     {lastChange && (
                       <p className="text-xs text-emerald-400 mt-1">
@@ -351,6 +669,44 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
                     </p>
                   </div>
 
+                  {/* Quick Actions */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {lead.phone && (
+                      <>
+                        <a
+                          href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors"
+                          title="Enviar WhatsApp"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                          </svg>
+                        </a>
+                        <a
+                          href={`tel:${lead.phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                          title="Llamar"
+                        >
+                          <Phone className="w-4 h-4" />
+                        </a>
+                      </>
+                    )}
+                    {lead.email && (
+                      <a
+                        href={`mailto:${lead.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                        title="Enviar Email"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+
                   {/* Arrow */}
                   <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors flex-shrink-0" />
                 </div>
@@ -360,12 +716,96 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
         </div>
       )}
 
+      {/* KANBAN VIEW */}
+      {viewMode === 'kanban' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          {/* Nuevo */}
+          <KanbanColumn
+            title="Nuevos"
+            color="blue"
+            leads={filteredLeads}
+            statusFilter="nuevo"
+            onLeadClick={openLeadDetail}
+            selectionMode={selectionMode}
+            selectedLeads={selectedLeads}
+            toggleSelectLead={toggleSelectLead}
+          />
+          
+          {/* Contactado */}
+          <KanbanColumn
+            title="Contactados"
+            color="amber"
+            leads={filteredLeads}
+            statusFilter="contactado"
+            onLeadClick={openLeadDetail}
+            selectionMode={selectionMode}
+            selectedLeads={selectedLeads}
+            toggleSelectLead={toggleSelectLead}
+          />
+          
+          {/* Respondio */}
+          <KanbanColumn
+            title="Respondieron"
+            color="emerald"
+            leads={filteredLeads}
+            statusFilter="respondio"
+            onLeadClick={openLeadDetail}
+            selectionMode={selectionMode}
+            selectedLeads={selectedLeads}
+            toggleSelectLead={toggleSelectLead}
+          />
+          
+          {/* Visita Agendada */}
+          <KanbanColumn
+            title="Visitas Agendadas"
+            color="purple"
+            leads={filteredLeads}
+            statusFilter="visita_agendada"
+            onLeadClick={openLeadDetail}
+            selectionMode={selectionMode}
+            selectedLeads={selectedLeads}
+            toggleSelectLead={toggleSelectLead}
+          />
+          
+          {/* Cerrado */}
+          <KanbanColumn
+            title="Cerrados"
+            color="emerald"
+            leads={filteredLeads}
+            statusFilter="cerrado"
+            onLeadClick={openLeadDetail}
+            selectionMode={selectionMode}
+            selectedLeads={selectedLeads}
+            toggleSelectLead={toggleSelectLead}
+          />
+          
+          {/* Perdido */}
+          <KanbanColumn
+            title="Perdidos"
+            color="red"
+            leads={filteredLeads}
+            statusFilter="perdido"
+            onLeadClick={openLeadDetail}
+            selectionMode={selectionMode}
+            selectedLeads={selectedLeads}
+            toggleSelectLead={toggleSelectLead}
+          />
+        </div>
+      )}
+
       {/* Lead Detail Modal */}
       {showLeadModal && selectedLead && (
         <LeadDetailModal 
           lead={selectedLead} 
           onClose={() => setShowLeadModal(false)}
-          onUpdate={loadLeads}
+          onUpdate={() => {
+            loadLeads()
+            loadSequencesData()
+          }}
+          sequences={sequences}
+          leadsInSequences={leadsInSequences}
+          onRemoveFromSequence={removeLeadFromSequence}
+          getLeadSequenceName={getLeadSequenceName}
         />
       )}
 
@@ -388,6 +828,65 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
           properties={properties}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700 shadow-2xl animate-scale-in">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
+                <Trash2 className="w-8 h-8 text-red-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">¿Eliminar leads?</h3>
+              <p className="text-slate-400">
+                Se eliminarán <span className="text-white font-semibold">{selectedLeads.size}</span> lead{selectedLeads.size > 1 ? 's' : ''} permanentemente.
+              </p>
+              <p className="text-red-400 text-sm mt-2">Esta acción no se puede deshacer.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deletingLeads}
+                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-xl text-white font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={deleteSelectedLeads}
+                disabled={deletingLeads}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:bg-red-500/50 rounded-xl text-white font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {deletingLeads ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-5 h-5" />
+                    Eliminar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Success Popup */}
+      {showDeleteSuccess && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl p-8 w-full max-w-sm text-center border border-emerald-500/30 shadow-2xl animate-bounce-in">
+            <div className="w-20 h-20 mx-auto mb-4 bg-emerald-500/20 rounded-full flex items-center justify-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">¡Eliminados!</h3>
+            <p className="text-emerald-400">
+              {deletedCount} lead{deletedCount > 1 ? 's' : ''} eliminado{deletedCount > 1 ? 's' : ''} correctamente
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -405,11 +904,27 @@ const CreateLeadModal = ({ onClose, onCreate, isCreating, properties }) => {
     source: '',
     notes: ''
   })
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [createdLeadName, setCreatedLeadName] = useState('')
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setCreatedLeadName(formData.name)
     onCreate(formData)
   }
+
+  // Listen for creation success
+  useEffect(() => {
+    if (!isCreating && createdLeadName) {
+      setShowSuccess(true)
+      // Auto close after 2 seconds
+      const timer = setTimeout(() => {
+        setShowSuccess(false)
+        onClose()
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [isCreating, createdLeadName])
 
   const channelOptions = [
     { value: 'whatsapp', label: 'WhatsApp' },
@@ -422,12 +937,27 @@ const CreateLeadModal = ({ onClose, onCreate, isCreating, properties }) => {
 
   const propertyTypeOptions = [
     { value: 'casa', label: 'Casa' },
+    { value: 'oficina', label: 'Oficina' },
     { value: 'departamento', label: 'Departamento' },
     { value: 'terreno', label: 'Terreno' },
-    { value: 'local', label: 'Local comercial' },
-    { value: 'oficina', label: 'Oficina' },
-    { value: 'bodega', label: 'Bodega' }
+    { value: 'local', label: 'Local comercial' }
   ]
+
+  // Success Popup
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-slate-800 rounded-2xl p-8 w-full max-w-sm text-center border border-slate-700 shadow-2xl animate-bounce-in">
+          <div className="w-20 h-20 mx-auto mb-4 bg-emerald-500/20 rounded-full flex items-center justify-center">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">¡Lead creado!</h3>
+          <p className="text-emerald-400">{createdLeadName}</p>
+          <p className="text-slate-400 text-sm mt-2">se agregó exitosamente</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -698,13 +1228,66 @@ const ImportLeadsModal = ({ isOpen, onClose, onImport, properties = [] }) => {
   const handleFile = (selectedFile) => {
     if (!selectedFile) return
     
+    // Validate file type
+    if (!selectedFile.name.endsWith('.csv') && selectedFile.type !== 'text/csv') {
+      alert('Por favor selecciona un archivo CSV')
+      return
+    }
+    
     setFile(selectedFile)
+    
     const reader = new FileReader()
     reader.onload = (e) => {
-      const { headers: parsedHeaders, data: parsedData } = parseCSV(e.target.result)
-      setHeaders(parsedHeaders)
-      setRawData(parsedData)
-      setStep(2)
+      try {
+        // Handle different encodings - remove BOM if present
+        let content = e.target.result || ''
+        if (typeof content !== 'string') {
+          content = String(content)
+        }
+        // Remove BOM (Byte Order Mark)
+        content = content.replace(/^\uFEFF/, '')
+        
+        // Simple CSV parsing
+        const lines = content.split(/\r?\n/).filter(line => line.trim())
+        
+        if (lines.length < 2) {
+          alert('El archivo CSV está vacío o no tiene datos')
+          return
+        }
+        
+        // Parse headers - split by comma and trim
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+        
+        // Parse data rows
+        const data = []
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+          if (values.length > 0 && values[0].trim()) {
+            const row = {}
+            headers.forEach((header, idx) => {
+              row[header] = values[idx] || ''
+            })
+            data.push(row)
+          }
+        }
+        
+        // Validate we got data
+        if (headers.length === 0) {
+          alert('No se encontraron encabezados en el archivo')
+          return
+        }
+        
+        // Update state
+        setHeaders(headers)
+        setRawData(data)
+        setStep(2)
+      } catch (err) {
+        console.error('Error parsing CSV:', err)
+        alert('Error al procesar el archivo CSV')
+      }
+    }
+    reader.onerror = () => {
+      alert('Error al leer el archivo')
     }
     reader.readAsText(selectedFile)
   }
@@ -730,27 +1313,31 @@ const ImportLeadsModal = ({ isOpen, onClose, onImport, properties = [] }) => {
   }, [])
   
   const transformRow = (row) => {
+    // Primero intentamos encontrar propertyId si hay propertyTitle
+    let foundPropertyId = null;
+    const propertyTitleVal = mapping.propertyTitle ? row[mapping.propertyTitle] || '' : '';
+    
+    // Try to match property title with existing properties
+    if (propertyTitleVal && properties.length > 0) {
+      const match = properties.find(p => 
+        p.title.toLowerCase().includes(propertyTitleVal.toLowerCase()) ||
+        propertyTitleVal.toLowerCase().includes(p.title.toLowerCase())
+      );
+      if (match) {
+        foundPropertyId = match.id;
+      }
+    }
+    
     const lead = {
       name: mapping.name ? row[mapping.name] || '' : '',
       email: mapping.email ? row[mapping.email] || '' : '',
       phone: mapping.phone ? row[mapping.phone] || '' : '',
       channel: mapping.channel ? row[mapping.channel]?.toLowerCase() || 'formulario' : 'formulario',
       propertyInterest: mapping.propertyInterest ? normalizePropertyType(row[mapping.propertyInterest]) : 'casa',
-      propertyId: '',
-      propertyTitle: mapping.propertyTitle ? row[mapping.propertyTitle] || '' : '',
+      propertyId: foundPropertyId,
+      propertyTitle: propertyTitleVal,
       source: mapping.source ? row[mapping.source] || 'Importado' : 'Importado',
       notes: mapping.notes ? row[mapping.notes] || '' : ''
-    }
-    
-    // Try to match property title with existing properties
-    if (lead.propertyTitle && properties.length > 0) {
-      const match = properties.find(p => 
-        p.title.toLowerCase().includes(lead.propertyTitle.toLowerCase()) ||
-        lead.propertyTitle.toLowerCase().includes(p.title.toLowerCase())
-      )
-      if (match) {
-        lead.propertyId = match.id
-      }
     }
     
     // Normalize channel
@@ -820,24 +1407,25 @@ const ImportLeadsModal = ({ isOpen, onClose, onImport, properties = [] }) => {
         try {
           const response = await fetch(`${API_URL}/leads`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(lead)
           })
           
           if (response.ok) {
             results.success++
           } else {
-            results.errors.push(`Error importing: ${lead.name}`)
+            const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }))
+            results.errors.push(`Error importing ${lead.name}: ${errorData.error || errorData.details?.[0] || 'Error desconocido'}`)
           }
         } catch (err) {
-          results.errors.push(`Error: ${lead.name}`)
+          results.errors.push(`Error de red: ${lead.name}`)
         }
       }
       
       setImportResult(results)
       onImport?.()
     } catch (err) {
-      setImportResult({ success: 0, errors: ['Error general al importar'] })
+      setImportResult({ success: 0, errors: ['Error general al importar: ' + err.message] })
     } finally {
       setImporting(false)
     }
@@ -945,7 +1533,11 @@ Lucía Torres,lucia.torres@email.com,+52 55 5555 6666,email,oficina,Oficina en S
                   ref={fileInputRef}
                   type="file"
                   accept=".csv"
-                  onChange={(e) => handleFile(e.target.files[0])}
+                  onChange={(e) => {
+                    handleFile(e.target.files[0])
+                    // Reset input so the same file can be selected again
+                    e.target.value = ''
+                  }}
                   className="hidden"
                 />
                 <FileText className={`w-12 h-12 mx-auto mb-4 ${isDragging ? 'text-emerald-400' : 'text-slate-500'}`} />
@@ -1035,7 +1627,7 @@ Lucía Torres,lucia.torres@email.com,+52 55 5555 6666,email,oficina,Oficina en S
               {/* Auto-detected notice */}
               {Object.keys(mapping).length > 0 && (
                 <div className="flex items-center gap-2 text-emerald-400 text-sm">
-                  <CheckCircle className="w-4 h-4" />
+                  <CheckCircle2 className="w-4 h-4" />
                   Se detectaron automáticamente algunas columnas
                 </div>
               )}
@@ -1098,7 +1690,7 @@ Lucía Torres,lucia.torres@email.com,+52 55 5555 6666,email,oficina,Oficina en S
                   {importResult.success > 0 ? (
                     <>
                       <div className="w-16 h-16 mx-auto mb-4 bg-emerald-500/20 rounded-full flex items-center justify-center">
-                        <CheckCircle className="w-8 h-8 text-emerald-400" />
+                        <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                       </div>
                       <h3 className="text-xl font-bold text-white mb-2">¡Importación exitosa!</h3>
                       <p className="text-emerald-400">{importResult.success} leads importados correctamente</p>
@@ -1622,16 +2214,147 @@ const SendFollowupModal = ({ isOpen, onClose, lead, onSend, channels = ['whatsap
 }
 
 // ==========================================
+// COMPONENTE: Kanban Column
+// ==========================================
+const KanbanColumn = ({ title, color, leads, statusFilter, onLeadClick, selectionMode, selectedLeads, toggleSelectLead }) => {
+  const colorClasses = {
+    blue: { header: 'bg-blue-500/20 border-blue-500/30', badge: 'bg-blue-500/20 text-blue-400', title: 'text-blue-400' },
+    amber: { header: 'bg-amber-500/20 border-amber-500/30', badge: 'bg-amber-500/20 text-amber-400', title: 'text-amber-400' },
+    emerald: { header: 'bg-emerald-500/20 border-emerald-500/30', badge: 'bg-emerald-500/20 text-emerald-400', title: 'text-emerald-400' },
+    purple: { header: 'bg-purple-500/20 border-purple-500/30', badge: 'bg-purple-500/20 text-purple-400', title: 'text-purple-400' },
+    cyan: { header: 'bg-cyan-500/20 border-cyan-500/30', badge: 'bg-cyan-500/20 text-cyan-400', title: 'text-cyan-400' },
+    red: { header: 'bg-red-500/20 border-red-500/30', badge: 'bg-red-500/20 text-red-400', title: 'text-red-400' }
+  }
+  
+  const classes = colorClasses[color] || colorClasses.blue
+  
+  // Filter leads by status
+  const filteredLeads = statusFilter ? leads.filter(l => l.status === statusFilter) : leads
+
+  return (
+    <div className={`rounded-xl border ${classes.header} overflow-hidden`}>
+      {/* Header */}
+      <div className="p-3 border-b border-slate-700/50">
+        <div className="flex items-center justify-between">
+          <h3 className={`font-semibold ${classes.title}`}>{title}</h3>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${classes.badge}`}>
+            {filteredLeads.length}
+          </span>
+        </div>
+      </div>
+      
+      {/* Leads */}
+      <div className="p-2 space-y-2 max-h-[500px] overflow-y-auto">
+        {filteredLeads.length === 0 ? (
+          <p className="text-slate-500 text-sm text-center py-4">Sin leads</p>
+        ) : (
+          filteredLeads.map(lead => {
+            const isSelected = selectedLeads.has(lead.id)
+            return (
+              <div
+                key={lead.id}
+                onClick={() => {
+                  if (selectionMode) {
+                    toggleSelectLead(lead.id)
+                  } else {
+                    onLeadClick(lead)
+                  }
+                }}
+                className={`
+                  p-3 rounded-lg cursor-pointer transition-all
+                  ${isSelected 
+                    ? 'bg-blue-500/20 border border-blue-500/50' 
+                    : 'bg-slate-800/50 hover:bg-slate-700/50 border border-transparent'
+                  }
+                `}
+              >
+                {/* Selection checkbox */}
+                {selectionMode && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleSelectLead(lead.id)
+                    }}
+                    className={`
+                      w-4 h-4 rounded border-2 flex items-center justify-center transition-all mb-2
+                      ${isSelected
+                        ? 'bg-blue-600 border-blue-600'
+                        : 'border-slate-600 hover:border-blue-500'
+                      }
+                    `}
+                  >
+                    {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                  </button>
+                )}
+                
+                {/* Lead name */}
+                <h4 className="font-medium text-white text-sm truncate">{lead.name}</h4>
+                
+                {/* Channel */}
+                <p className="text-slate-400 text-xs mt-1 capitalize flex items-center gap-1">
+                  {lead.channel === 'whatsapp' && '📱'}
+                  {lead.channel === 'email' && '📧'}
+                  {lead.channel === 'instagram' && '📸'}
+                  {lead.channel}
+                </p>
+                
+                {/* Quick actions */}
+                {!selectionMode && (
+                  <div className="flex gap-1 mt-2">
+                    {lead.phone && (
+                      <a
+                        href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                        title="WhatsApp"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                      </a>
+                    )}
+                    {lead.email && (
+                      <a
+                        href={`mailto:${lead.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                        title="Email"
+                      >
+                        <Mail className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ==========================================
 // COMPONENTE: Lead Detail Modal
 // ==========================================
-const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
+const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSequences = {}, onRemoveFromSequence, getLeadSequenceName }) => {
   const [timeline, setTimeline] = useState([])
   const [loading, setLoading] = useState(true)
   const [showSendModal, setShowSendModal] = useState(false)
+  const [showChatModal, setShowChatModal] = useState(false)
+  const [showContractModal, setShowContractModal] = useState(false)
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
   const [currentStatus, setCurrentStatus] = useState(lead.status)
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [removing, setRemoving] = useState(false)
+
+  // Get which sequence this lead is in
+  const leadSequenceName = getLeadSequenceName ? getLeadSequenceName(lead.id) : null
+  const isInSequence = !!leadSequenceName
 
   useEffect(() => {
     loadTimeline()
@@ -1697,16 +2420,32 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
       if (response.ok) {
         setCurrentStatus(status)
         onUpdate?.()
-        setToastMessage('Estado actualizado correctamente')
-        setToastType('success')
-        setShowToast(true)
+        
+        // Si el lead pasa a "cerrado", ofrecer generar contrato
+        if (status === 'cerrado') {
+          setToastMessage('Estado actualizado. ¿Deseas generar un contrato?')
+          setToastType('info')
+          setShowToast(true)
+          // Abrir modal de contrato después de un breve delay
+          setTimeout(() => setShowContractModal(true), 1500)
+        } else {
+          setToastMessage('Estado actualizado correctamente')
+          setToastType('success')
+          setShowToast(true)
+        }
         
         // Add notification if lead responded
         if (status === 'respondio') {
-          addNotification(NOTIFICATION_TYPES.LEAD_RESPONDED, {
-            name: lead.name
-          })
+          try {
+            addNotification(NOTIFICATION_TYPES.LEAD_RESPONDED, {
+              name: lead.name
+            })
+          } catch (notifErr) {
+            console.error('Error adding notification:', notifErr)
+          }
         }
+      } else {
+        throw new Error('Response not ok')
       }
     } catch (err) {
       console.error('Error updating status:', err)
@@ -1716,11 +2455,93 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
     }
   }
 
+  // Toggle automation pause/resume
+  const toggleAutomationPause = async () => {
+    try {
+      const endpoint = lead.automationPaused 
+        ? `${API_URL}/leads/${lead.id}/automation/resume`
+        : `${API_URL}/leads/${lead.id}/automation/pause`
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setToastMessage(data.message)
+        setToastType('success')
+        setShowToast(true)
+        onUpdate?.()
+      } else {
+        throw new Error('Error toggling automation')
+      }
+    } catch (err) {
+      console.error('Error toggling automation:', err)
+      setToastMessage('Error al cambiar estado de automatización')
+      setToastType('error')
+      setShowToast(true)
+    }
+  }
+
+  // Start automation sequence
+  const startAutomation = async () => {
+    try {
+      const response = await fetch(`${API_URL}/leads/${lead.id}/automation/start`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setToastMessage(data.message)
+        setToastType('success')
+        setShowToast(true)
+        onUpdate?.()
+        await loadTimeline()
+      } else {
+        throw new Error('Error starting automation')
+      }
+    } catch (err) {
+      console.error('Error starting automation:', err)
+      setToastMessage('Error al iniciar secuencia de automatización')
+      setToastType('error')
+      setShowToast(true)
+    }
+  }
+
+  // Remove lead from sequence
+  const handleRemoveFromSequence = async () => {
+    setRemoving(true)
+    try {
+      const success = await onRemoveFromSequence?.(lead.id)
+      if (success) {
+        setToastMessage('Lead removido de la secuencia')
+        setToastType('success')
+        setShowToast(true)
+        setShowRemoveConfirm(false)
+        onUpdate?.()
+        onClose?.()
+      } else {
+        throw new Error('Error removing from sequence')
+      }
+    } catch (err) {
+      console.error('Error removing from sequence:', err)
+      setToastMessage('Error al remover de la secuencia')
+      setToastType('error')
+      setShowToast(true)
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const getStatusBadge = (status) => {
     const badges = {
       nuevo: { color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: 'Nuevo' },
       contactado: { color: 'bg-amber-500/20 text-amber-400 border-amber-500/30', label: 'Contactado' },
       respondio: { color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Respondió' },
+      visita_agendada: { color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', label: 'Visita Agendada' },
+      cerrado: { color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: 'Cerrado' },
       perdido: { color: 'bg-red-500/20 text-red-400 border-red-500/30', label: 'Perdido' }
     }
     return badges[status] || badges.nuevo
@@ -1731,13 +2552,19 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
       nuevo: 'Nuevo',
       contactado: 'Contactado',
       respondio: 'Respondió',
+      visita_agendada: 'Visita Agendada',
+      cerrado: 'Cerrado',
       perdido: 'Perdido'
     }
-    return `${labels[from] || from} → ${labels[to] || to}`
+    const fromLabel = from ? (labels[from] || from) : 'Nuevo'
+    const toLabel = to ? (labels[to] || to) : to
+    return `${fromLabel} → ${toLabel}`
   }
 
   const formatDateTime = (dateString) => {
+    if (!dateString) return 'Sin fecha'
     const date = new Date(dateString)
+    if (isNaN(date.getTime())) return 'Sin fecha'
     return date.toLocaleDateString('es-ES', { 
       month: 'short', 
       day: 'numeric',
@@ -1755,6 +2582,50 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
           type={toastType} 
           onClose={() => setShowToast(false)} 
         />
+      )}
+
+      {/* Remove from Sequence Confirmation */}
+      {showRemoveConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="relative bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700 shadow-2xl animate-scale-in">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 bg-amber-500/20 rounded-full flex items-center justify-center">
+                <Zap className="w-8 h-8 text-amber-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">¿Sacar de la secuencia?</h3>
+              <p className="text-slate-400">
+                El lead <span className="text-white font-semibold">{lead.name}</span> será removido de "{leadSequenceName}" y podrás enviar follow-ups manuales.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRemoveConfirm(false)}
+                disabled={removing}
+                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-xl text-white font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRemoveFromSequence}
+                disabled={removing}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:bg-red-500/50 rounded-xl text-white font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {removing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Sacando...
+                  </>
+                ) : (
+                  <>
+                    <X className="w-5 h-5" />
+                    Sacar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1799,7 +2670,11 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
               </div>
               <div className="bg-slate-700/50 rounded-xl p-4">
                 <p className="text-slate-400 text-sm mb-1">Interés</p>
-                <p className="text-white font-medium capitalize">{lead.propertyInterest}</p>
+                {lead.propertyInterest ? (
+                  <p className="text-white font-medium capitalize">{lead.propertyInterest}</p>
+                ) : (
+                  <p className="text-slate-500">No especificado</p>
+                )}
               </div>
               <div className="bg-slate-700/50 rounded-xl p-4 col-span-2">
                 <p className="text-slate-400 text-sm mb-1">Propiedad</p>
@@ -1817,24 +2692,66 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
             <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
               <p className="text-slate-400 text-sm mb-3">Cambiar Estado</p>
               <div className="flex flex-wrap gap-2">
-                {[
-                  { value: 'nuevo', color: 'blue' },
-                  { value: 'contactado', color: 'amber' },
-                  { value: 'respondio', color: 'emerald' },
-                  { value: 'perdido', color: 'red' }
-                ].map(({ value, color }) => (
-                  <button
-                    key={value}
-                    onClick={() => updateStatus(value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all hover:scale-105 ${
-                      currentStatus === value
-                        ? `bg-${color}-600 text-white`
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                  >
-                    {value}
-                  </button>
-                ))}
+                <button
+                  onClick={() => updateStatus('nuevo')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all hover:scale-105 ${
+                    currentStatus === 'nuevo'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  nuevo
+                </button>
+                <button
+                  onClick={() => updateStatus('contactado')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all hover:scale-105 ${
+                    currentStatus === 'contactado'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  contactado
+                </button>
+                <button
+                  onClick={() => updateStatus('respondio')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all hover:scale-105 ${
+                    currentStatus === 'respondio'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  respondio
+                </button>
+                <button
+                  onClick={() => updateStatus('visita_agendada')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all hover:scale-105 ${
+                    currentStatus === 'visita_agendada'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  visita agendada
+                </button>
+                <button
+                  onClick={() => updateStatus('cerrado')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all hover:scale-105 ${
+                    currentStatus === 'cerrado'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  cerrado
+                </button>
+                <button
+                  onClick={() => updateStatus('perdido')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all hover:scale-105 ${
+                    currentStatus === 'perdido'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  perdido
+                </button>
               </div>
             </div>
 
@@ -1844,16 +2761,17 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
                 <p className="text-slate-400 text-sm mb-3">Historial de Cambios</p>
                 <div className="space-y-2">
                   {lead.statusHistory.slice().reverse().map((change, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
+                    <div key={change.id || idx} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
                       <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
                         <Clock className="w-4 h-4 text-blue-400" />
                       </div>
                       <div className="flex-1">
                         <p className="text-white text-sm font-medium">
-                          {getStatusChangeLabel(change.from, change.to)}
+                          {getStatusChangeLabel(change.previousStatus, change.newStatus)}
                         </p>
                         <p className="text-slate-500 text-xs">
-                          {formatDateTime(change.changedAt)}
+                          {formatDateTime(change.createdAt)}
+                          {change.user && change.user.name && ` • ${change.user.name}`}
                         </p>
                       </div>
                     </div>
@@ -1865,15 +2783,129 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
             {/* Timeline / Sequence */}
             <div className="animate-fade-in-up" style={{ animationDelay: '300ms' }}>
               <div className="flex items-center justify-between mb-4">
-                <p className="text-white font-medium">Secuencia de Follow-up</p>
-                <button
-                  onClick={() => setShowSendModal(true)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 flex items-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  Enviar Mensaje
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-white font-medium">Secuencia de Follow-up</p>
+                  
+                  {/* Show which sequence the lead is in */}
+                  {isInSequence ? (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-violet-500/20 text-violet-400 border border-violet-500/30 flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      {leadSequenceName}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-600 text-slate-400 border border-slate-500/30">
+                      📋 Manual
+                    </span>
+                  )}
+                  
+                  {/* Show paused badge if applicable */}
+                  {lead.inAutomation && lead.automationPaused && (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      ⏸️ Pausado
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  {/* Remove from Sequence Button */}
+                  {isInSequence && (
+                    <button
+                      onClick={() => setShowRemoveConfirm(true)}
+                      className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105 flex items-center gap-2 bg-red-600/80 hover:bg-red-600 text-white"
+                    >
+                      <X className="w-4 h-4" />
+                      Sacar de Secuencia
+                    </button>
+                  )}
+                  
+                  {/* Pause/Resume Button */}
+                  {lead.inAutomation && !isInSequence && (
+                    <button
+                      onClick={toggleAutomationPause}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105 flex items-center gap-2 ${
+                        lead.automationPaused
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          : 'bg-amber-600 hover:bg-amber-500 text-white'
+                      }`}
+                    >
+                      {lead.automationPaused ? (
+                        <>
+                          <Play className="w-4 h-4" />
+                          Reanudar
+                        </>
+                      ) : (
+                        <>
+                          <Pause className="w-4 h-4" />
+                          Pausar
+                        </>
+                      )}
+                    </button>
+                  )}
+                  
+                  {/* Send Manual Message Button - always enabled */}
+                  <button
+                    onClick={() => setShowSendModal(true)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 hover:scale-105"
+                    title="Enviar mensaje manual"
+                  >
+                    <Send className="w-4 h-4" />
+                    Enviar Mensaje
+                  </button>
+
+                  {/* Chat Button - Opens ChatModal */}
+                  <button
+                    onClick={() => setShowChatModal(true)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 hover:scale-105"
+                    title="Abrir chat en vivo"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    Chatear
+                  </button>
+                </div>
               </div>
+              
+              {/* Info box when lead is in automation (optional info, not blocking) */}
+              {lead.inAutomation && isInSequence && (
+                <div className="mb-4 p-4 bg-violet-500/10 border border-violet-500/30 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-violet-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Zap className="w-5 h-5 text-violet-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-medium mb-1">
+                        Este lead también está en la secuencia: "{leadSequenceName}"
+                      </p>
+                      <p className="text-slate-400 text-sm">
+                        Los mensajes manuales se envían fuera de la secuencia de automatización.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Automation Progress Bar */}
+              {lead.inAutomation && (
+                <div className="mb-4 p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-violet-400 text-sm font-medium">Progreso de automatización</span>
+                    <span className="text-violet-300 text-sm">
+                      {lead.automationDay || 0}/14 días
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-700 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-violet-500 to-purple-500 h-2 rounded-full transition-all"
+                      style={{ width: `${((lead.automationDay || 0) / 14) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-slate-400 text-xs mt-2">
+                    {lead.automationPaused 
+                      ? '⏸️ Automatización pausada - los mensajes no se enviarán automáticamente'
+                      : '⚡ Automatización activa - los mensajes se enviarán automáticamente'
+                    }
+                  </p>
+                </div>
+              )}
 
               {loading ? (
                 <div className="text-center py-8 text-slate-500">
@@ -1883,7 +2915,7 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
                 <div className="space-y-3">
                   {timeline.map((item, idx) => (
                     <div 
-                      key={item.day}
+                      key={item.day || item.id || `timeline-${idx}`}
                       className={`flex items-center gap-4 p-4 rounded-xl border transition-all animate-fade-in-up ${
                         item.status === 'sent'
                           ? 'bg-emerald-500/10 border-emerald-500/30'
@@ -1941,6 +2973,14 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
                 </div>
               )}
             </div>
+
+            {/* Contratos Section */}
+            <div className="mt-6 pt-6 border-t border-slate-700">
+              <LeadContractsHistory
+                leadId={lead.id}
+                onGenerateNew={() => setShowContractModal(true)}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1951,6 +2991,28 @@ const LeadDetailModal = ({ lead, onClose, onUpdate }) => {
         onClose={() => setShowSendModal(false)}
         lead={lead}
         onSend={sendFollowUp}
+      />
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={showChatModal}
+        onClose={() => setShowChatModal(false)}
+        lead={lead}
+        onMessageSent={(message) => {
+          // Optionally refresh lead data or show notification
+          console.log('Message sent:', message)
+        }}
+      />
+
+      {/* Generate Contract Modal */}
+      <GenerateContractModal
+        isOpen={showContractModal}
+        onClose={() => setShowContractModal(false)}
+        lead={lead}
+        onContractGenerated={(doc) => {
+          console.log('Contract generated:', doc)
+          onUpdate?.()
+        }}
       />
     </>
   )

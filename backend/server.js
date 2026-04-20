@@ -3,10 +3,26 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-require('dotenv').config();
+// Load .env from current directory (backend folder)
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-// Initialize database
-require('./services/database');
+// Initialize Prisma (multi-tenant con Supabase)
+const { prisma } = require('./services/db');
+
+// Initialize Resend email service
+const { initializeResend } = require('./services/emailService');
+const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_5TpNcdfJ_4emo6iSq8E4NcF9PobjBbhoX';
+initializeResend(RESEND_API_KEY);
+
+// Initialize automation service (cron job for sequences)
+const { startAutomationService } = require('./services/automationService');
+
+// Initialize scheduler service (cron job for scheduled posts)
+const { startScheduler } = require('./services/scheduler');
+
+// Middleware
+const { authRateLimit, generalRateLimit } = require('./middleware/rateLimiter');
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const propertyRoutes = require('./routes/properties');
 const contentRoutes = require('./routes/content');
@@ -14,15 +30,23 @@ const scheduleRoutes = require('./routes/schedule');
 const leadRoutes = require('./routes/leads');
 const authRoutes = require('./routes/auth');
 const automationRoutes = require('./routes/automation');
+const chatRoutes = require('./routes/chat');
+const notificationRoutes = require('./routes/notifications');
+const contractRoutes = require('./routes/contracts');
 const { testConnection } = require('./services/cloudinaryService');
 const { testInstagramConnection } = require('./services/instagramPublisher');
-const { requireAuth } = require('./routes/auth');
+const { requireAuth } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
+// Middleware - CORS with Authorization header support
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -46,19 +70,52 @@ const upload = multer({
 // Make upload middleware available to routes
 app.set('upload', upload);
 
-// Public routes (no auth required)
-app.use('/api/auth', authRoutes);
+// Public routes (no auth required) - with rate limiting
+app.use('/api/auth', authRateLimit(5, 15 * 60 * 1000), authRoutes);
 
-// Protected routes (auth required)
-app.use('/api/properties', requireAuth, propertyRoutes);
-app.use('/api/content', requireAuth, contentRoutes);
-app.use('/api/schedule', requireAuth, scheduleRoutes);
-app.use('/api/leads', requireAuth, leadRoutes);
-app.use('/api/automation', requireAuth, automationRoutes);
+// Chat routes - MIXTO: webhooks públicos, resto protegido
+app.use('/api/chat', chatRoutes);
+
+// Protected routes (auth required) - with general rate limiting
+app.use('/api/properties', generalRateLimit(100, 60000), requireAuth, propertyRoutes);
+app.use('/api/content', generalRateLimit(100, 60000), requireAuth, contentRoutes);
+app.use('/api/schedule', generalRateLimit(100, 60000), requireAuth, scheduleRoutes);
+app.use('/api/leads', generalRateLimit(100, 60000), requireAuth, leadRoutes);
+app.use('/api/automation', generalRateLimit(100, 60000), requireAuth, automationRoutes);
+app.use('/api/notifications', generalRateLimit(100, 60000), requireAuth, notificationRoutes);
+app.use('/api/emails', generalRateLimit(100, 60000), requireAuth, require('./routes/emails'));
+app.use('/api/contracts', generalRateLimit(100, 60000), requireAuth, contractRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Prueba de webhook público - para verificar que ngrok funciona
+app.get('/api/test-webhook', (req, res) => {
+  console.log('📥 Test webhook llamado');
+  console.log('  Query:', req.query);
+  res.json({ received: true, query: req.query });
+});
+
+// Debug endpoint - ver variables de entorno de Facebook
+app.get('/api/debug/facebook', (req, res) => {
+  const vars = {
+    FACEBOOK_ACCESS_TOKEN: process.env.FACEBOOK_ACCESS_TOKEN ? 'SET (length: ' + process.env.FACEBOOK_ACCESS_TOKEN.length + ')' : 'NOT SET',
+    FACEBOOK_VERIFY_TOKEN: process.env.FACEBOOK_VERIFY_TOKEN || 'NOT SET',
+    FACEBOOK_PAGE_ID: process.env.FACEBOOK_PAGE_ID || 'NOT SET'
+  };
+  console.log('📊 Debug Facebook env:', vars);
+  res.json(vars);
+});
+
+// Debug endpoint - ver tenant del usuario autenticado
+app.get('/api/debug/me', requireAuth, (req, res) => {
+  res.json({
+    userId: req.userId,
+    tenantId: req.tenantId,
+    user: req.user
+  });
 });
 
 // Cloudinary test endpoint
@@ -109,11 +166,16 @@ app.get('/api/instagram/test', async (req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message || 'Algo salió mal' });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);
+
+  // Iniciar servicios después de que el servidor esté corriendo
+  setTimeout(() => {
+    startAutomationService(prisma);
+    startScheduler();
+    console.log('📅 Scheduler service started - checking for due posts every 30s');
+  }, 3000);
 });
