@@ -7,6 +7,8 @@ import {
   Facebook, MessageSquare, Loader2, Check, Pause,
   PlayCircle, Rocket, Sparkles, Bell, ArrowRight
 } from 'lucide-react'
+import SequenceBuilderV2 from '../components/automation/SequenceBuilderV2'
+import SequenceList from '../components/automation/SequenceList'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -268,11 +270,11 @@ const SequenceEditorModal = ({ isOpen, onClose, sequence, onSave }) => {
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-white">Día {step.day}</span>
                       <span className={`px-2 py-0.5 rounded text-xs ${
-                        step.channels.length > 0 
+                        step.channels?.length > 0 
                           ? 'bg-emerald-500/20 text-emerald-400' 
                           : 'bg-slate-600 text-slate-400'
                       }`}>
-                        {step.channels.length} canales
+                        {step.channels?.length || 0} canales
                       </span>
                     </div>
                     <p className="text-slate-400 text-sm mt-1">{step.label}</p>
@@ -695,7 +697,7 @@ export default function AutomationPage() {
   const [loading, setLoading] = useState(true)
   
   // Modals & Popups
-  const [showSequenceEditor, setShowSequenceEditor] = useState(false)
+  const [showBuilder, setShowBuilder] = useState(false)
   const [showMessagePreview, setShowMessagePreview] = useState(false)
   const [selectedLead, setSelectedLead] = useState(null)
   const [selectedStep, setSelectedStep] = useState(null)
@@ -727,17 +729,6 @@ export default function AutomationPage() {
       if (leadsRes.ok) {
         const data = await leadsRes.json()
         setLeads(data.leads || [])
-        
-        // Initialize automation status for each lead
-        const automationStatus = {}
-        data.leads?.forEach(lead => {
-          automationStatus[lead.id] = {
-            active: lead.followUps?.length < (activeSequence?.steps?.length || 4),
-            paused: false,
-            completed: lead.followUps?.length >= (activeSequence?.steps?.length || 4)
-          }
-        })
-        setLeadsInAutomation(automationStatus)
       }
 
       if (sequencesRes.ok) {
@@ -745,6 +736,26 @@ export default function AutomationPage() {
         setSequences(data.sequences || [])
         const active = data.sequences?.find(s => s.isActive)
         setActiveSequence(active || data.sequences?.[0] || null)
+        
+        // Get leads in each sequence grouped by sequenceId
+        const leadsBySeq = {}
+        for (const seq of data.sequences || []) {
+          leadsBySeq[seq.id] = []
+        }
+        for (const seq of data.sequences || []) {
+          try {
+            const leadsRes = await fetch(`${API_URL}/automation/sequences/${seq.id}/leads`, { headers: getAuthHeaders() })
+            if (leadsRes.ok) {
+              const leadsData = await leadsRes.json()
+              if (leadsData.leads && Array.isArray(leadsData.leads)) {
+                leadsBySeq[seq.id] = leadsData.leads
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching leads for sequence:', e)
+          }
+        }
+        setLeadsInAutomation(leadsBySeq)
       }
     } catch (err) {
       console.error('Error loading data:', err)
@@ -823,20 +834,76 @@ export default function AutomationPage() {
     }
   }
 
-  const pauseLeadAutomation = (leadId) => {
-    setLeadsInAutomation(prev => ({
-      ...prev,
-      [leadId]: { ...prev[leadId], paused: true, active: false }
-    }))
-    showSuccessPopup('Secuencia pausada para este lead')
+  const pauseLeadAutomation = async (leadId) => {
+    try {
+      const response = await fetch(`${API_URL}/leads/${leadId}/automation/pause`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
+      if (response.ok) {
+        setLeadsInAutomation(prev => ({
+          ...prev,
+          [leadId]: { ...prev[leadId], paused: true, active: false }
+        }))
+        showSuccessPopup('Secuencia pausada para este lead')
+      }
+    } catch (err) {
+      console.error('Error pausing automation:', err)
+    }
   }
 
-  const resumeLeadAutomation = (leadId) => {
-    setLeadsInAutomation(prev => ({
-      ...prev,
-      [leadId]: { ...prev[leadId], paused: false, active: true }
-    }))
-    showSuccessPopup('Secuencia reactivada')
+  const resumeLeadAutomation = async (leadId) => {
+    try {
+      const response = await fetch(`${API_URL}/leads/${leadId}/automation/resume`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
+      if (response.ok) {
+        setLeadsInAutomation(prev => ({
+          ...prev,
+          [leadId]: { ...prev[leadId], paused: false, active: true }
+        }))
+        showSuccessPopup('Secuencia reactivada')
+      }
+    } catch (err) {
+      console.error('Error resuming automation:', err)
+    }
+  }
+  
+  // Start automation for a lead (add to sequence and start)
+  const startLeadAutomation = async (leadId, sequenceId) => {
+    try {
+      // First add lead to sequence
+      const addRes = await fetch(`${API_URL}/automation/sequences/${sequenceId}/leads`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ leadIds: [leadId] })
+      })
+      
+      if (!addRes.ok) {
+        const error = await addRes.json()
+        showSuccessPopup(error.error || 'Error al agregar lead a la secuencia')
+        return
+      }
+      
+      // Then start automation
+      const startRes = await fetch(`${API_URL}/leads/${leadId}/start-automation`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ sequenceId })
+      })
+      
+      if (startRes.ok) {
+        setLeadsInAutomation(prev => ({
+          ...prev,
+          [leadId]: { active: true, paused: false, completed: false }
+        }))
+        showSuccessPopup('Secuencia iniciada')
+        loadData() // Refresh data
+      }
+    } catch (err) {
+      console.error('Error starting automation:', err)
+    }
   }
 
   const showSuccessPopup = (message) => {
@@ -847,13 +914,18 @@ export default function AutomationPage() {
   // Stats
   const stats = {
     totalLeads: leads.length,
-    inAutomation: leads.filter(l => leadsInAutomation[l.id]?.active && !leadsInAutomation[l.id]?.paused).length,
-    paused: leads.filter(l => leadsInAutomation[l.id]?.paused).length,
+    inAutomation: leads.filter(l => Object.values(leadsInAutomation).some(seqLeads => seqLeads.some(sl => sl.id === l.id))).length,
+    paused: leads.filter(l => l.status === 'pausado').length,
     pending: leads.filter(l => l.status !== 'respondio' && l.status !== 'perdido').length
   }
 
   // Color map for timeline
   const stepColors = ['blue', 'violet', 'amber', 'emerald', 'pink', 'cyan', 'orange', 'purple']
+
+  // Create new sequence - opens SequenceBuilderV2
+  const createNewSequence = () => {
+    setShowBuilder(true)
+  }
 
   return (
     <div className="space-y-6">
@@ -873,11 +945,11 @@ export default function AutomationPage() {
             <p className="text-slate-400 mt-1">Secuencias de follow-up con IA</p>
           </div>
           <button
-            onClick={() => setShowSequenceEditor(true)}
+            onClick={createNewSequence}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white transition-all hover:scale-105"
           >
-            <Settings className="w-5 h-5" />
-            Configurar Secuencia
+            <Plus className="w-5 h-5" />
+            Crear Nueva Secuencia
           </button>
         </div>
       </AnimatedCard>
@@ -917,265 +989,36 @@ export default function AutomationPage() {
             <h3 className="text-3xl font-bold text-white">{stats.pending}</h3>
           </div>
         </div>
-      </AnimatedCard>
+</AnimatedCard>
 
-      {/* How Leads Enter Automation - Info Box */}
+      {/* Sequences List - using SequenceList component */}
       <AnimatedCard delay={200}>
-        <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl p-6 border border-cyan-500/30">
-          <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-cyan-400" />
-            ¿Cómo entran los leads a la automatización?
-          </h3>
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
-            <div className="bg-slate-800/50 rounded-xl p-4">
-              <p className="text-cyan-400 font-medium mb-1">1. Manualmente</p>
-              <p className="text-slate-400">Agregá leads desde la sección "Leads" y se activarán en la secuencia</p>
-            </div>
-            <div className="bg-slate-800/50 rounded-xl p-4">
-              <p className="text-cyan-400 font-medium mb-1">2. Formularios Web</p>
-              <p className="text-slate-400">Integración futura con webhooks de formularios (Gravity Forms, Typeform)</p>
-            </div>
-            <div className="bg-slate-800/50 rounded-xl p-4">
-              <p className="text-cyan-400 font-medium mb-1">3. Redes Sociales</p>
-              <p className="text-slate-400">Cuando conectes las APIs de Meta, los leads de IG/FB entrarán automáticamente</p>
-            </div>
-          </div>
-        </div>
-      </AnimatedCard>
-
-      {/* Automation Sequence Timeline */}
-      <AnimatedCard delay={300}>
-        <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">{activeSequence?.name || 'Secuencia de Follow-up'}</h2>
-              <p className="text-slate-400 text-sm">{activeSequence?.description || 'Automatización activa'}</p>
-            </div>
-            <button
-              onClick={() => setShowSequenceEditor(true)}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm transition-all hover:scale-105"
-            >
-              <Edit3 className="w-4 h-4" />
-              Editar
-            </button>
-          </div>
-
-          {/* Timeline */}
-          <div className="relative">
-            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-700 hidden md:block" />
-
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeSequence?.steps?.map((step, idx) => {
-                  const colorClass = stepColors[idx % stepColors.length]
-                  const colorClasses = {
-                    blue: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                    violet: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
-                    amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-                    emerald: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-                    pink: 'bg-pink-500/20 text-pink-400 border-pink-500/30'
-                  }
-
-                  return (
-                    <div 
-                      key={step.id} 
-                      className="relative flex items-start gap-4 animate-fade-in-up"
-                      style={{ animationDelay: `${idx * 100}ms` }}
-                    >
-                      <div className={`relative z-10 w-12 h-12 rounded-2xl border flex items-center justify-center ${colorClasses[colorClass]}`}>
-                        <span className="text-lg font-bold">{step.day}</span>
-                      </div>
-
-                      <div className="flex-1 bg-slate-700/50 rounded-xl p-5 border border-slate-600">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold text-white">{step.label}</h3>
-                          <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Activo
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mb-3">
-                          {step.channels?.map(channel => {
-                            const config = CHANNEL_CONFIG[channel]
-                            const Icon = config.icon
-                            return (
-                              <span 
-                                key={channel}
-                                className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${config.bgColor} ${config.textColor}`}
-                              >
-                                <Icon className="w-3 h-3" />
-                                {config.label}
-                              </span>
-                            )
-                          })}
-                        </div>
-
-                        {step.channels?.includes('whatsapp') && step.templates?.whatsapp?.message && (
-                          <div className="bg-slate-800 rounded-lg p-3 text-slate-300 text-sm">
-                            <MessageCircle className="w-3 h-3 inline mr-1 text-emerald-400" />
-                            {step.templates.whatsapp.message.substring(0, 80)}...
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="hidden md:flex items-center">
-                        <ChevronRight className="w-5 h-5 text-slate-500" />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </AnimatedCard>
-
-      {/* Leads needing follow-up */}
-      <AnimatedCard delay={400}>
-        <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Leads en automatización</h2>
-              <p className="text-slate-400 text-sm">Gestiona la secuencia de follow-up para cada lead</p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 text-slate-400 animate-spin mx-auto" />
-            </div>
-          ) : leads.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">
-              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No hay leads registrados</p>
-              <p className="text-sm mt-1">Agregá leads desde la sección de Leads</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {leads
-                .filter(l => l.status !== 'respondio' && l.status !== 'perdido')
-                .slice(0, 8)
-                .map((lead, idx) => {
-                  const followUpCount = lead.followUps?.length || 0
-                  const nextStep = activeSequence?.steps?.[followUpCount]
-                  const isSending = sendingLead === lead.id
-                  const leadStatus = leadsInAutomation[lead.id] || { active: true, paused: false, completed: false }
-                  const isPaused = leadStatus.paused
-                  const isCompleted = leadStatus.completed || followUpCount >= (activeSequence?.steps?.length || 4)
-
-                  return (
-                    <div 
-                      key={lead.id}
-                      className={`flex items-center gap-4 p-4 rounded-xl border transition-all animate-fade-in-up ${
-                        isPaused 
-                          ? 'bg-slate-700/30 border-amber-500/30' 
-                          : 'bg-slate-700/50 border-slate-600 hover:border-blue-500/30'
-                      }`}
-                      style={{ animationDelay: `${idx * 50}ms` }}
-                    >
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-violet-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
-                        {lead.name?.charAt(0) || '?'}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-white truncate">{lead.name}</h4>
-                          {isPaused && (
-                            <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
-                              Pausado
-                            </span>
-                          )}
-                          {isCompleted && (
-                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs">
-                              Completado
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-slate-400 text-sm truncate">
-                          {lead.propertyTitle || lead.propertyInterest || 'Sin propiedad asignada'}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            lead.channel === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400' :
-                            lead.channel === 'instagram' ? 'bg-pink-500/20 text-pink-400' :
-                            lead.channel === 'email' ? 'bg-blue-500/20 text-blue-400' :
-                            'bg-slate-500/20 text-slate-400'
-                          }`}>
-                            {lead.channel || 'sin canal'}
-                          </span>
-                          <span className="text-slate-500 text-xs">
-                            {followUpCount}/{activeSequence?.steps?.length || 0} mensajes
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Progress bar */}
-                      <div className="hidden md:block w-24">
-                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all"
-                            style={{ width: `${(followUpCount / (activeSequence?.steps?.length || 4)) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {/* Pause/Resume Button */}
-                        {!isCompleted && (
-                          <button
-                            onClick={() => isPaused ? resumeLeadAutomation(lead.id) : pauseLeadAutomation(lead.id)}
-                            className={`p-2 rounded-lg transition-all hover:scale-110 ${
-                              isPaused 
-                                ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' 
-                                : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
-                            }`}
-                            title={isPaused ? 'Reactivar' : 'Pausar'}
-                          >
-                            {isPaused ? <PlayCircle className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-                          </button>
-                        )}
-
-                        {nextStep && !isPaused ? (
-                          <button
-                            onClick={() => {
-                              setSelectedLead(lead)
-                              setSelectedStep(nextStep)
-                              setShowMessagePreview(true)
-                            }}
-                            disabled={isSending}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-sm font-medium transition-all hover:scale-105"
-                          >
-                            {isSending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Rocket className="w-4 h-4" />
-                            )}
-                            {isSending ? 'Enviando...' : 'Enviar'}
-                          </button>
-                        ) : isCompleted ? (
-                          <span className="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm flex items-center gap-1">
-                            <Check className="w-4 h-4" />
-                            Secuencia completa
-                          </span>
-                        ) : isPaused ? (
-                          <span className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm flex items-center gap-1">
-                            <Pause className="w-4 h-4" />
-                            Pausado
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  )
-                })}
-            </div>
-          )}
-        </div>
-      </AnimatedCard>
+        <SequenceList
+          sequences={sequences}
+          leads={leads}
+          leadsInSequences={leadsInAutomation}
+          apiUrl={API_URL}
+          getAuthHeaders={getAuthHeaders}
+          onCreateNew={() => {
+            setActiveSequence(null)
+            setShowBuilder(true)
+          }}
+          onEdit={(seq) => {
+            setActiveSequence(seq)
+            setShowBuilder(true)
+          }}
+          onRefresh={loadData}
+          onDeleteSequence={async (seq) => {
+            const res = await fetch(`${API_URL}/automation/sequences/${seq.id}`, {
+              method: 'DELETE',
+              headers: getAuthHeaders()
+            })
+            if (res.ok) {
+              loadData()
+            }
+          }}
+        />
+</AnimatedCard>
 
       {/* AI Message Preview Info */}
       <AnimatedCard delay={500}>
@@ -1230,12 +1073,15 @@ export default function AutomationPage() {
       </AnimatedCard>
 
       {/* Modals */}
-      <SequenceEditorModal
-        isOpen={showSequenceEditor}
-        onClose={() => setShowSequenceEditor(false)}
-        sequence={activeSequence}
-        onSave={saveSequence}
-      />
+      {showBuilder && (
+        <SequenceBuilderV2
+          onClose={() => setShowBuilder(false)}
+          onSave={(newSeq) => {
+            setShowBuilder(false)
+            loadData()
+          }}
+        />
+      )}
 
       <MessagePreviewModal
         isOpen={showMessagePreview}

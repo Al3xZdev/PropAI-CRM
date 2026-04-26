@@ -93,14 +93,15 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
         setSequences(seqData.sequences || [])
       }
       
-      // Get leads in each sequence
+      // Get leads in each sequence with their step progress
       const leadsInSeqData = {}
       for (const seq of sequences) {
         try {
           const res = await fetch(`${API_URL}/automation/sequences/${seq.id}/leads`, { headers: getAuthHeaders() })
           if (res.ok) {
             const data = await res.json()
-            leadsInSeqData[seq.id] = data.leadIds || []
+            // Store full lead objects with currentStep info
+            leadsInSeqData[seq.id] = data.leads || []
           }
         } catch (e) {
           console.error('Error fetching leads for sequence:', e)
@@ -114,8 +115,8 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
 
   // Get sequence name for a specific lead
   const getLeadSequenceName = (leadId) => {
-    for (const [seqId, leadIds] of Object.entries(leadsInSequences)) {
-      if (leadIds.includes(leadId)) {
+    for (const [seqId, leadObjs] of Object.entries(leadsInSequences)) {
+      if (leadObjs.some(l => l.id === leadId)) {
         const seq = sequences.find(s => s.id === seqId)
         return seq?.name || 'Secuencia'
       }
@@ -123,10 +124,22 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
     return null
   }
 
+  // Get full lead data (with currentStep) from any sequence
+  const getLeadInSequence = (leadId) => {
+    for (const [seqId, leadObjs] of Object.entries(leadsInSequences)) {
+      const found = leadObjs.find(l => l.id === leadId)
+      if (found) {
+        const seq = sequences.find(s => s.id === seqId)
+        return { ...found, sequenceName: seq?.name, sequenceId: seqId, sequenceChannel: found.sequenceChannel }
+      }
+    }
+    return null
+  }
+
   // Get sequence ID for a specific lead
   const getLeadSequenceId = (leadId) => {
-    for (const [seqId, leadIds] of Object.entries(leadsInSequences)) {
-      if (leadIds.includes(leadId)) {
+    for (const [seqId, leadObjs] of Object.entries(leadsInSequences)) {
+      if (leadObjs.some(l => l.id === leadId)) {
         return seqId
       }
     }
@@ -806,6 +819,7 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
           leadsInSequences={leadsInSequences}
           onRemoveFromSequence={removeLeadFromSequence}
           getLeadSequenceName={getLeadSequenceName}
+          getLeadInSequence={getLeadInSequence}
         />
       )}
 
@@ -2339,7 +2353,7 @@ const KanbanColumn = ({ title, color, leads, statusFilter, onLeadClick, selectio
 // ==========================================
 // COMPONENTE: Lead Detail Modal
 // ==========================================
-const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSequences = {}, onRemoveFromSequence, getLeadSequenceName }) => {
+const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSequences = {}, onRemoveFromSequence, getLeadSequenceName, getLeadInSequence }) => {
   const [timeline, setTimeline] = useState([])
   const [loading, setLoading] = useState(true)
   const [showSendModal, setShowSendModal] = useState(false)
@@ -2355,6 +2369,7 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
   // Get which sequence this lead is in
   const leadSequenceName = getLeadSequenceName ? getLeadSequenceName(lead.id) : null
   const isInSequence = !!leadSequenceName
+  const leadSeqData = getLeadInSequence ? getLeadInSequence(lead.id) : null
 
   useEffect(() => {
     loadTimeline()
@@ -2913,55 +2928,61 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {timeline.map((item, idx) => (
-                    <div 
-                      key={item.day || item.id || `timeline-${idx}`}
-                      className={`flex items-center gap-4 p-4 rounded-xl border transition-all animate-fade-in-up ${
-                        item.status === 'sent'
-                          ? 'bg-emerald-500/10 border-emerald-500/30'
-                          : 'bg-slate-700/50 border-slate-600'
-                      }`}
-                      style={{ animationDelay: `${idx * 100}ms` }}
-                    >
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        item.status === 'sent'
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-slate-600 text-slate-400'
-                      }`}>
-                        {item.status === 'sent' ? (
-                          <CheckCircle2 className="w-5 h-5" />
-                        ) : (
-                          <Clock className="w-5 h-5" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-white">{item.label}</span>
-                          {item.channel && (
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              item.channel === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400' :
-                              item.channel === 'email' ? 'bg-blue-500/20 text-blue-400' :
-                              'bg-slate-600 text-slate-400'
-                            }`}>
-                              {item.channel}
-                            </span>
+                  {timeline.map((item, idx) => {
+                    const displayChannel = (item.type === 'followup' && isInSequence && leadSeqData?.sequenceChannel)
+                      ? leadSeqData.sequenceChannel
+                      : item.channel;
+                    return (
+                      <div 
+                        key={item.day || item.id || `timeline-${idx}`}
+                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all animate-fade-in-up ${
+                          item.status === 'sent'
+                            ? 'bg-emerald-500/10 border-emerald-500/30'
+                            : 'bg-slate-700/50 border-slate-600'
+                        }`}
+                        style={{ animationDelay: `${idx * 100}ms` }}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          item.status === 'sent'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-slate-600 text-slate-400'
+                        }`}>
+                          {item.status === 'sent' ? (
+                            <CheckCircle2 className="w-5 h-5" />
+                          ) : (
+                            <Clock className="w-5 h-5" />
                           )}
                         </div>
-                        <p className="text-slate-400 text-sm">{item.description}</p>
-                        {item.message && (
-                          <p className="text-slate-300 text-sm mt-2 p-2 bg-slate-800/50 rounded-lg">
-                            "{item.message}"
-                          </p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-white">{item.label}</span>
+                            {displayChannel && (
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                displayChannel === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400' :
+                                displayChannel === 'email' ? 'bg-blue-500/20 text-blue-400' :
+                                displayChannel === 'instagram' ? 'bg-pink-500/20 text-pink-400' :
+                                'bg-slate-600 text-slate-400'
+                              }`}>
+                                {displayChannel}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-400 text-sm">{item.description}</p>
+                          {item.message && (
+                            <p className="text-slate-300 text-sm mt-2 p-2 bg-slate-800/50 rounded-lg">
+                              "{item.message}"
+                            </p>
+                          )}
+                        </div>
+                        {item.status === 'sent' && item.sentAt && (
+                          <span className="text-xs text-emerald-400 flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            Enviado
+                          </span>
                         )}
                       </div>
-                      {item.status === 'sent' && item.sentAt && (
-                        <span className="text-xs text-emerald-400 flex items-center gap-1">
-                          <Check className="w-3 h-3" />
-                          Enviado
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                   
                   {timeline.length === 0 && (
                     <div className="text-center py-8 text-slate-500 bg-slate-700/30 rounded-xl">

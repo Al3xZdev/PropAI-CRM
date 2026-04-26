@@ -1,434 +1,658 @@
+// Leads Routes - Multi-tenant con Prisma
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const { prisma } = require('../services/db');
+const { requireAuth } = require('./auth');
+const { sanitizeLead, validateLead, sanitizeString, isValidUUID } = require('../utils/validation');
+const { calculateScore } = require('../services/leadScoringService');
+const permissionsService = require('../services/permissionsService');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'leads.json');
+// Apply auth middleware to all routes
+router.use(requireAuth);
 
-// Ensure data directory exists
-const dataDir = path.dirname(DATA_FILE);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-// Load leads from file
-let leads = new Map();
-function loadLeads() {
+/**
+ * GET /api/leads
+ * Get leads for the current user (filtered by role)
+ */
+router.get('/', async (req, res) => {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      leads = new Map(Object.entries(data));
-      console.log(`Loaded ${leads.size} leads from file`);
+    const { propertyInterest, status, channel } = req.query;
+    
+    const where = { tenantId: req.tenantId };
+    
+    // AGENTS can only see their assigned leads
+    const hasFullRead = await permissionsService.hasPermission(req.userId, 'leads', 'read');
+    const userRole = req.user?.role;
+    
+    // If user is NOT admin/manager AND does NOT have full read permission, filter by assignedTo
+    if (userRole === 'agent' || (!hasFullRead && userRole !== 'admin' && userRole !== 'manager')) {
+      where.assignedTo = req.userId;
     }
-  } catch (err) {
-    console.error('Error loading leads:', err);
-    leads = new Map();
-  }
-}
-
-function saveLeads() {
-  try {
-    const data = Object.fromEntries(leads);
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error('Error saving leads:', err);
-  }
-}
-
-// Initialize with sample leads if empty
-function initializeSampleLeads() {
-  if (leads.size === 0) {
-    const sampleLeads = [
-      {
-        id: uuidv4(),
-        name: 'María González',
-        email: 'maria.gonzalez@email.com',
-        phone: '+52 55 1234 5678',
-        channel: 'whatsapp',
-        status: 'nuevo',
-        propertyInterest: 'casa',
-        propertyId: null,
-        propertyTitle: 'Casa moderna en Lomas',
-        source: 'Instagram',
-        notes: 'Interesada en casas con jardín',
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: null,
-        followUps: []
+    
+    if (propertyInterest) where.propertyInterest = propertyInterest;
+    if (status) where.status = status;
+    if (channel) where.channel = channel;
+    
+    const leads = await prisma.lead.findMany({
+      where,
+      include: {
+        property: {
+          select: { id: true, title: true, propertyType: true }
+        },
+        statusHistory: {
+          orderBy: { createdAt: 'desc' },
+          take: 20
+        }
       },
-      {
-        id: uuidv4(),
-        name: 'Carlos Rodríguez',
-        email: 'carlos.rod@email.com',
-        phone: '+52 55 9876 5432',
-        channel: 'email',
-        status: 'contactado',
-        propertyInterest: 'departamento',
-        propertyId: null,
-        propertyTitle: 'Departamento en Polanco',
-        source: 'Formulario Web',
-        notes: 'Busca zona céntrica, presupuesto flexible',
-        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        followUps: [
-          { day: 1, sentAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Primer contacto de bienvenida' }
-        ]
-      },
-      {
-        id: uuidv4(),
-        name: 'Ana Martínez',
-        email: 'ana.martinez@email.com',
-        phone: '+52 55 5555 4444',
-        channel: 'formulario',
-        status: 'respondio',
-        propertyInterest: 'casa',
-        propertyId: null,
-        propertyTitle: 'Casa en Condesa',
-        source: 'Portal Inmobiliario',
-        notes: 'Muy interesada, quiere agendar visita',
-        createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        followUps: [
-          { day: 1, sentAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Información inicial enviada' },
-          { day: 3, sentAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), channel: 'whatsapp', message: 'Seguimiento por WhatsApp' },
-          { day: 7, sentAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), channel: 'whatsapp', message: 'Recordatorio de visita' }
-        ]
-      },
-      {
-        id: uuidv4(),
-        name: 'Roberto Sánchez',
-        email: 'roberto.s@email.com',
-        phone: '+52 55 7777 8888',
-        channel: 'whatsapp',
-        status: 'nuevo',
-        propertyInterest: 'terreno',
-        propertyId: null,
-        propertyTitle: 'Terreno en CDMX',
-        source: 'WhatsApp',
-        notes: 'Viene de recomendación de cliente',
-        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: null,
-        followUps: []
-      },
-      {
-        id: uuidv4(),
-        name: 'Laura Hernández',
-        email: 'laura.hernandez@email.com',
-        phone: '+52 55 3333 2222',
-        channel: 'instagram',
-        status: 'contactado',
-        propertyInterest: 'departamento',
-        propertyId: null,
-        propertyTitle: 'Penthouse en Santa Fe',
-        source: 'Instagram',
-        notes: 'Cliente de alto perfil, responder rápido',
-        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        followUps: [
-          { day: 1, sentAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Detalles del penthouse enviados' }
-        ]
-      },
-      {
-        id: uuidv4(),
-        name: 'Diego Ramírez',
-        email: 'diego.ram@email.com',
-        phone: '+52 55 6666 5555',
-        channel: 'formulario',
-        status: 'respondio',
-        propertyInterest: 'casa',
-        propertyId: null,
-        propertyTitle: 'Casa en Coyoacán',
-        source: 'Formulario Web',
-        notes: 'Interesado en la propiedad, ya visitó el lugar',
-        createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        followUps: [
-          { day: 1, sentAt: new Date(Date.now() - 11 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Bienvenida enviada' },
-          { day: 3, sentAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(), channel: 'whatsapp', message: 'Video de la propiedad' },
-          { day: 7, sentAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), channel: 'whatsapp', message: 'Agendamos visita' },
-          { day: 14, sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Post-visita: muchas gracias por venir' }
-        ]
-      },
-      {
-        id: uuidv4(),
-        name: 'Patricia López',
-        email: 'patricia.l@email.com',
-        phone: '+52 55 8888 9999',
-        channel: 'whatsapp',
-        status: 'nuevo',
-        propertyInterest: 'departamento',
-        propertyId: null,
-        propertyTitle: 'Departamento en Roma Norte',
-        source: 'WhatsApp',
-        notes: 'Primera vez compranding casa, necesita guía',
-        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: null,
-        followUps: []
-      },
-      {
-        id: uuidv4(),
-        name: 'Fernando Torres',
-        email: 'fernando.torres@email.com',
-        phone: '+52 55 1111 2222',
-        channel: 'email',
-        status: 'contactado',
-        propertyInterest: 'local',
-        propertyId: null,
-        propertyTitle: 'Local comercial en Insurgentes',
-        source: 'Email',
-        notes: 'Busca local para restaurante',
-        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        followUps: [
-          { day: 1, sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Información del local enviada' }
-        ]
-      },
-      {
-        id: uuidv4(),
-        name: 'Carmen Rivera',
-        email: 'carmen.rivera@email.com',
-        phone: '+52 55 4444 3333',
-        channel: 'instagram',
-        status: 'respondio',
-        propertyInterest: 'casa',
-        propertyId: null,
-        propertyTitle: 'Casa en San Ángel',
-        source: 'Instagram',
-        notes: 'Muy interessada en la ubicación',
-        createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        lastContact: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        followUps: [
-          { day: 1, sentAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Bienvenida' },
-          { day: 3, sentAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), channel: 'whatsapp', message: 'Galería de fotos' },
-          { day: 7, sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), channel: 'whatsapp', message: 'Video tour' },
-          { day: 14, sentAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), channel: 'email', message: 'Oferta especial' }
-        ]
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // Add computed automation fields and scoring
+    const leadsWithAutomation = leads.map(lead => {
+      const hasFollowUps = lead.automationStartedAt !== null;
+      let automationDay = 0;
+      if (lead.automationStartedAt) {
+        const daysSinceStart = Math.floor((Date.now() - new Date(lead.automationStartedAt).getTime()) / (1000 * 60 * 60 * 24));
+        automationDay = Math.min(daysSinceStart, 30); // Cap at 30 days
       }
-    ];
-
-    sampleLeads.forEach(lead => leads.set(lead.id, lead));
-    saveLeads();
-    console.log(`Initialized ${sampleLeads.length} sample leads`);
+      
+      return {
+        ...lead,
+        inAutomation: hasFollowUps,
+        automationDay,
+        automationPaused: lead.automationPaused,
+        scoring: calculateScore(lead)
+      };
+    });
+    
+    res.json({ leads: leadsWithAutomation });
+  } catch (error) {
+    console.error('Error fetching leads:', error);
+    res.status(500).json({ error: 'Error al obtener leads' });
   }
-}
-
-// Initialize
-loadLeads();
-initializeSampleLeads();
-
-// Get all leads
-router.get('/', (req, res) => {
-  const { propertyInterest, status, channel } = req.query;
-  let allLeads = Array.from(leads.values());
-  
-  if (propertyInterest) {
-    allLeads = allLeads.filter(l => l.propertyInterest === propertyInterest);
-  }
-  if (status) {
-    allLeads = allLeads.filter(l => l.status === status);
-  }
-  if (channel) {
-    allLeads = allLeads.filter(l => l.channel === channel);
-  }
-  
-  // Sort by createdAt descending
-  allLeads.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
-  res.json({ leads: allLeads });
 });
 
-// Get lead by ID
-router.get('/:id', (req, res) => {
-  const lead = leads.get(req.params.id);
-  if (!lead) {
-    return res.status(404).json({ error: 'Lead no encontrado' });
-  }
-  res.json({ lead });
-});
-
-// Create new lead
-router.post('/', (req, res) => {
-  const { name, email, phone, channel, propertyInterest, propertyId, propertyTitle, source, notes } = req.body;
-  
-  if (!name) {
-    return res.status(400).json({ error: 'El nombre es requerido' });
-  }
-
-  const lead = {
-    id: uuidv4(),
-    name,
-    email: email || '',
-    phone: phone || '',
-    channel: channel || 'formulario',
-    status: 'nuevo',
-    propertyInterest: propertyInterest || 'casa',
-    propertyId: propertyId || null,
-    propertyTitle: propertyTitle || '',
-    source: source || 'Manual',
-    notes: notes || '',
-    createdAt: new Date().toISOString(),
-    lastContact: null,
-    followUps: []
-  };
-
-  leads.set(lead.id, lead);
-  saveLeads();
-
-  res.status(201).json({ success: true, lead });
-});
-
-// Update lead status
-router.put('/:id/status', (req, res) => {
-  const lead = leads.get(req.params.id);
-  if (!lead) {
-    return res.status(404).json({ error: 'Lead no encontrado' });
-  }
-
-  const { status } = req.body;
-  const previousStatus = lead.status;
-  
-  // Add to status history
-  if (!lead.statusHistory) lead.statusHistory = [];
-  lead.statusHistory.push({
-    from: previousStatus,
-    to: status,
-    changedAt: new Date().toISOString()
-  });
-  
-  lead.status = status;
-  lead.lastContact = new Date().toISOString();
-  lead.updatedAt = new Date().toISOString();
-  
-  leads.set(lead.id, lead);
-  saveLeads();
-
-  res.json({ success: true, lead, previousStatus });
-});
-
-// Send follow-up message
-router.post('/:id/followup', (req, res) => {
-  const lead = leads.get(req.params.id);
-  if (!lead) {
-    return res.status(404).json({ error: 'Lead no encontrado' });
-  }
-
-  const { day, channel, message } = req.body;
-  
-  // Simulate AI-generated message if not provided
-  const generatedMessage = message || generateFollowUpMessage(lead, day, channel);
-  
-  const followUp = {
-    day: day || lead.followUps.length + 1,
-    sentAt: new Date().toISOString(),
-    channel: channel || 'whatsapp',
-    message: generatedMessage
-  };
-
-  lead.followUps.push(followUp);
-  lead.lastContact = new Date().toISOString();
-  
-  leads.set(lead.id, lead);
-  saveLeads();
-
-  res.json({ success: true, followUp, lead });
-});
-
-// Get follow-up timeline for a lead
-router.get('/:id/timeline', (req, res) => {
-  const lead = leads.get(req.params.id);
-  if (!lead) {
-    return res.status(404).json({ error: 'Lead no encontrado' });
-  }
-
-  // Generate full timeline (days 1, 3, 7, 14)
-  const timeline = [
-    { day: 1, label: 'Día 1', description: 'Mensaje de bienvenida', status: 'sent' },
-    { day: 3, label: 'Día 3', description: 'Información adicional', status: 'pending' },
-    { day: 7, label: 'Día 7', description: 'Seguimiento personalizado', status: 'pending' },
-    { day: 14, label: 'Día 14', description: 'Último intento / Oferta especial', status: 'pending' }
-  ];
-
-  // Mark sent follow-ups
-  lead.followUps.forEach(fu => {
-    const idx = timeline.findIndex(t => t.day === fu.day);
-    if (idx !== -1) {
-      timeline[idx].status = 'sent';
-      timeline[idx].sentAt = fu.sentAt;
-      timeline[idx].channel = fu.channel;
-      timeline[idx].message = fu.message;
+/**
+ * GET /api/leads/stats/summary
+ * Get lead statistics for the dashboard (filtered by role)
+ */
+router.get('/stats/summary', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const userRole = req.user?.role;
+    
+    // Build where clause based on role
+    let baseWhere = { tenantId };
+    let leadFilter = { tenantId };
+    
+    // Agents only see their own leads
+    if (userRole === 'agent') {
+      baseWhere.assignedTo = req.userId;
+      leadFilter.assignedTo = req.userId;
     }
-  });
-
-  res.json({ timeline, lead });
-});
-
-// Get statistics
-router.get('/stats/summary', (req, res) => {
-  const allLeads = Array.from(leads.values());
-  
-  const stats = {
-    total: allLeads.length,
-    nuevos: allLeads.filter(l => l.status === 'nuevo').length,
-    contactados: allLeads.filter(l => l.status === 'contactado').length,
-    respondieron: allLeads.filter(l => l.status === 'respondio').length,
-    perdidos: allLeads.filter(l => l.status === 'perdido').length,
-    byChannel: {
-      whatsapp: allLeads.filter(l => l.channel === 'whatsapp').length,
-      email: allLeads.filter(l => l.channel === 'email').length,
-      formulario: allLeads.filter(l => l.channel === 'formulario').length,
-      instagram: allLeads.filter(l => l.channel === 'instagram').length
-    },
-    byPropertyType: {
-      casa: allLeads.filter(l => l.propertyInterest === 'casa').length,
-      departamento: allLeads.filter(l => l.propertyInterest === 'departamento').length,
-      terreno: allLeads.filter(l => l.propertyInterest === 'terreno').length,
-      local: allLeads.filter(l => l.propertyInterest === 'local').length,
-      oficina: allLeads.filter(l => l.propertyInterest === 'oficina').length
-    }
-  };
-
-  res.json(stats);
-});
-
-// Helper: Generate AI-like follow-up message
-function generateFollowUpMessage(lead, day, channel) {
-  const messages = {
-    1: [
-      `¡Hola ${lead.name}! Gracias por tu interés en nuestra propiedad. He preparado información exclusiva sobre ${lead.propertyTitle || 'las propiedades disponibles'}. ¿Te gustaría recibir más detalles?`,
-      `Hola ${lead.name}, recibe una cálida bienvenida. Vi que te interesa nuestra oferta en ${lead.propertyTitle || 'el sector inmobiliario'}. Estoy aquí para ayudarte con cualquier pregunta.`,
-      `¡${lead.name}! Qué alegría que contactes con nosotros. He creado un dossier especial con todo lo que necesitas saber sobre ${lead.propertyTitle || 'esta oportunidad'}. ¿Cuándo podemos hablar?`
-    ],
-    3: [
-      `¡Hola ${lead.name}!Espero que hayas recibido mi mensaje anterior. He preparado un video tour de ${lead.propertyTitle || 'la propiedad'} donde puedes ver cada rincón. ¿Te gustaría verlo?`,
-      `${lead.name}, ¿tuviste oportunidad de revisar la información? He agregado fotos adicionales de ${lead.propertyTitle || 'el espacio'} que creo te van a encantar. ¿Alguna duda?`,
-      `¡Hey ${lead.name}! Solo quería asegurarme de que tuvieras toda la información. He preparado una presentación virtual de ${lead.propertyTitle || 'la propiedad'} que muestra todos los detalles.`
-    ],
-    7: [
-      `¡Hola ${lead.name}! ¿Cómo estás? Quiero compartirte algo especial: tenemos una oportunidad limitada en ${lead.propertyTitle || 'esta zona'} y quería darte prioridad. ¿Podemos agendar una llamada rápida?`,
-      `${lead.name}, he estado pensando en ti y en lo que buscas. ${lead.propertyTitle || 'Esta propiedad'} tiene características únicas que se ajustan perfectamente a lo que describes. ¿Qué te parece si agendamos una visita?`,
-      `¡Buenas noticias ${lead.name}! Tenemos una fecha disponible para visita de ${lead.propertyTitle || 'la propiedad'} la próxima semana. ¿Te interesa? Es una oportunidad que no querrás perder.`
-    ],
-    14: [
-      `${lead.name}, esta será mi última mensaje de seguimiento. ${lead.propertyTitle || 'La propiedad'} sigue disponible pero ha tenido mucho interés. Si aún estás interesado, me encantaría ayudarte. ¡Quedo atento!`,
-      `¡Hola ${lead.name}! Quiero ser transparente contigo: han surgido otros interesados en ${lead.propertyTitle || 'esta propiedad'}. Pero siempre hay room para el mejor postor. ¿Te gustaría hacer una oferta?`,
-      `${lead.name}, entiendo que a veces el timing no es el ideal. Si en el futuro buscas property en ${lead.propertyTitle || 'esta zona'}, aquí estaré. Esta es una puerta que nunca se cierra del todo. Un abrazo.`
-    ]
-  };
-
-  const dayMessages = messages[day] || messages[1];
-  return dayMessages[Math.floor(Math.random() * dayMessages.length)];
-}
-
-// Delete lead
-router.delete('/:id', (req, res) => {
-  if (!leads.has(req.params.id)) {
-    return res.status(404).json({ error: 'Lead no encontrado' });
+    
+    // Get counts by status
+    const [total, nuevos, contactados, responded, visitados, realizados, perdidos] = await Promise.all([
+      prisma.lead.count({ where: baseWhere }),
+      prisma.lead.count({ where: { ...baseWhere, status: 'nuevo' } }),
+      prisma.lead.count({ where: { ...baseWhere, status: 'contactado' } }),
+      prisma.lead.count({ where: { ...baseWhere, status: 'respondio' } }),
+      prisma.lead.count({ where: { ...baseWhere, status: 'visita_agendada' } }),
+      prisma.lead.count({ where: { ...baseWhere, status: 'visita_realizada' } }),
+      prisma.lead.count({ where: { ...baseWhere, status: 'perdido' } })
+    ]);
+    
+    // Get counts by channel
+    const byChannel = await prisma.lead.groupBy({
+      by: ['channel'],
+      where: baseWhere,
+      _count: true
+    });
+    
+    // Get recent leads (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const recentLeads = await prisma.lead.count({
+      where: {
+        ...leadFilter,
+        createdAt: { gte: sevenDaysAgo }
+      }
+    });
+    
+    res.json({
+      total,
+      nuevos,
+      contactados,
+      responded,
+      visitados,
+      realizados,
+      perdidos,
+      recentLeads,
+      byChannel: byChannel.reduce((acc, item) => {
+        acc[item.channel || 'unknown'] = item._count;
+        return acc;
+      }, {})
+    });
+  } catch (error) {
+    console.error('Error fetching leads stats:', error);
+    res.status(500).json({ error: 'Error al obtener estadísticas' });
   }
-  
-  leads.delete(req.params.id);
-  saveLeads();
-  
-  res.json({ success: true, message: 'Lead eliminado' });
+});
+
+/**
+ * GET /api/leads/:id
+ * Get a single lead
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const lead = await prisma.lead.findFirst({
+      where: { 
+        id: req.params.id,
+        tenantId: req.tenantId
+      },
+      include: {
+        property: true,
+        conversations: {
+          include: {
+            messages: {
+              orderBy: { sentAt: 'desc' },
+              take: 50
+            }
+          }
+        },
+        followUps: {
+          orderBy: { day: 'asc' }
+        }
+      }
+    });
+    
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+    
+    res.json({ lead });
+  } catch (error) {
+    console.error('Error fetching lead:', error);
+    res.status(500).json({ error: 'Error al obtener el lead' });
+  }
+});
+
+/**
+ * POST /api/leads
+ * Create a new lead
+ */
+router.post('/', async (req, res) => {
+  try {
+    // Validate input
+    const validation = validateLead(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: 'Datos de lead inválidos',
+        details: validation.errors 
+      });
+    }
+    
+    // Sanitize input
+    const cleanLead = sanitizeLead(req.body);
+    
+    const { name, email, phone, channel, propertyInterest, propertyId, propertyTitle, source, notes } = cleanLead;
+
+    // Validar propertyId si se proporciona
+    let validPropertyId = null;
+    if (propertyId && isValidUUID(propertyId)) {
+      const property = await prisma.property.findFirst({
+        where: { id: propertyId, tenantId: req.tenantId }
+      });
+      if (property) {
+        validPropertyId = propertyId;
+      }
+    }
+
+    const lead = await prisma.lead.create({
+      data: {
+        tenantId: req.tenantId,
+        name,
+        email,
+        phone,
+        channel: channel || 'formulario',
+        propertyInterest,
+        propertyId: validPropertyId,
+        propertyTitle,
+        source: source || 'Manual',
+        notes,
+        status: 'nuevo'
+      }
+    });
+    
+    console.log(`✅ Lead created: ${name}`);
+    
+    res.status(201).json({ success: true, lead });
+  } catch (error) {
+    console.error('Error creating lead:', error);
+    res.status(500).json({ error: 'Error al crear el lead' });
+  }
+});
+
+/**
+ * PUT /api/leads/:id
+ * Update a lead
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    // Verify lead belongs to tenant
+    const existing = await prisma.lead.findFirst({
+      where: { 
+        id: req.params.id,
+        tenantId: req.tenantId
+      }
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+
+    const { name, email, phone, channel, status, propertyInterest, propertyId, propertyTitle, source, notes } = req.body;
+
+    const updatedLead = await prisma.lead.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name && { name }),
+        ...(email !== undefined && { email }),
+        ...(phone !== undefined && { phone }),
+        ...(channel && { channel }),
+        ...(status && { status }),
+        ...(propertyInterest !== undefined && { propertyInterest }),
+        ...(propertyId !== undefined && { propertyId }),
+        ...(propertyTitle !== undefined && { propertyTitle }),
+        ...(source !== undefined && { source }),
+        ...(notes !== undefined && { notes }),
+        lastContact: status === 'contactado' || status === 'respondio' ? new Date() : undefined
+      }
+    });
+    
+    res.json({ success: true, lead: updatedLead });
+  } catch (error) {
+    console.error('Error updating lead:', error);
+    res.status(500).json({ error: 'Error al actualizar el lead' });
+  }
+});
+
+/**
+ * DELETE /api/leads/:id
+ * Delete a lead
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    // Verify lead belongs to tenant
+    const existing = await prisma.lead.findFirst({
+      where: { 
+        id: req.params.id,
+        tenantId: req.tenantId
+      }
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+
+    await prisma.lead.delete({
+      where: { id: req.params.id }
+    });
+    
+    res.json({ success: true, message: 'Lead eliminado' });
+  } catch (error) {
+    console.error('Error deleting lead:', error);
+    res.status(500).json({ error: 'Error al eliminar el lead' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/followups
+ * Add a follow-up to a lead
+ */
+router.post('/:id/followups', async (req, res) => {
+  try {
+    const { day, channel, message } = req.body;
+    
+    if (!day || !channel || !message) {
+      return res.status(400).json({ error: 'Día, canal y mensaje son requeridos' });
+    }
+
+    // Verify lead belongs to tenant
+    const existing = await prisma.lead.findFirst({
+      where: { 
+        id: req.params.id,
+        tenantId: req.tenantId
+      }
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+
+    const followUp = await prisma.followUp.create({
+      data: {
+        leadId: req.params.id,
+        day,
+        channel,
+        message,
+        automated: false
+      }
+    });
+    
+    res.status(201).json({ success: true, followUp });
+  } catch (error) {
+    console.error('Error adding follow-up:', error);
+    res.status(500).json({ error: 'Error al agregar follow-up' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/start-automation
+ * Start automation for a lead
+ */
+router.post('/:id/start-automation', async (req, res) => {
+  try {
+    const { sequenceId } = req.body;
+
+    // Verify lead belongs to tenant
+    const lead = await prisma.lead.findFirst({
+      where: { 
+        id: req.params.id,
+        tenantId: req.tenantId
+      }
+    });
+    
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+
+    const leadSequence = await prisma.leadSequence.create({
+      data: {
+        leadId: req.params.id,
+        sequenceId: sequenceId || null,
+        currentStep: 0
+      }
+    });
+
+    await prisma.lead.update({
+      where: { id: req.params.id },
+      data: {
+        inAutomation: true,
+        automationPaused: false,
+        automationStartedAt: new Date()
+      }
+    });
+    
+    res.json({ success: true, message: 'Automatización iniciada' });
+  } catch (error) {
+    console.error('Error starting automation:', error);
+    res.status(500).json({ error: 'Error al iniciar automatización' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/pause-automation
+ * Pause automation for a lead
+ */
+router.post('/:id/pause-automation', async (req, res) => {
+  try {
+    // Verify lead belongs to tenant
+    const lead = await prisma.lead.findFirst({
+      where: { 
+        id: req.params.id,
+        tenantId: req.tenantId
+      }
+    });
+    
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+
+    await prisma.lead.update({
+      where: { id: req.params.id },
+      data: {
+        automationPaused: true,
+        automationExitReason: 'paused_by_user'
+      }
+    });
+    
+    res.json({ success: true, message: 'Automatización pausada' });
+  } catch (error) {
+    console.error('Error pausing automation:', error);
+    res.status(500).json({ error: 'Error al pausar automatización' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/automation/pause
+ * Pause automation for a lead (alias for /:id/pause-automation)
+ */
+router.post('/:id/automation/pause', async (req, res) => {
+  try {
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId }
+    });
+    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+
+    await prisma.lead.update({
+      where: { id: req.params.id },
+      data: { automationPaused: true, automationExitReason: 'paused_by_user' }
+    });
+    res.json({ success: true, message: 'Automatización pausada' });
+  } catch (error) {
+    console.error('Error pausing automation:', error);
+    res.status(500).json({ error: 'Error al pausar automatización' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/automation/resume
+ * Resume automation for a lead
+ */
+router.post('/:id/automation/resume', async (req, res) => {
+  try {
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId }
+    });
+    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+
+    await prisma.lead.update({
+      where: { id: req.params.id },
+      data: { automationPaused: false }
+    });
+    res.json({ success: true, message: 'Automatización reanudada' });
+  } catch (error) {
+    console.error('Error resuming automation:', error);
+    res.status(500).json({ error: 'Error al reanudar automatización' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/automation/stop
+ * Stop automation for a lead
+ */
+router.post('/:id/automation/stop', async (req, res) => {
+  try {
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId }
+    });
+    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+
+    await prisma.lead.update({
+      where: { id: req.params.id },
+      data: {
+        inAutomation: false,
+        automationPaused: false,
+        automationExitedAt: new Date(),
+        automationExitReason: 'stopped_by_user'
+      }
+    });
+    res.json({ success: true, message: 'Automatización detenida' });
+  } catch (error) {
+    console.error('Error stopping automation:', error);
+    res.status(500).json({ error: 'Error al detener automatización' });
+  }
+});
+
+/**
+ * POST /api/leads/:id/stop-automation
+ * Stop automation for a lead
+ */
+router.post('/:id/stop-automation', async (req, res) => {
+  try {
+    // Verify lead belongs to tenant
+    const lead = await prisma.lead.findFirst({
+      where: { 
+        id: req.params.id,
+        tenantId: req.tenantId
+      }
+    });
+    
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+
+    await prisma.lead.update({
+      where: { id: req.params.id },
+      data: {
+        inAutomation: false,
+        automationPaused: false,
+        automationExitedAt: new Date(),
+        automationExitReason: 'stopped_by_user'
+      }
+    });
+    
+    // Also delete any lead sequences
+    await prisma.leadSequence.deleteMany({
+      where: { leadId: req.params.id }
+    });
+    
+    res.json({ success: true, message: 'Automatización detenida' });
+  } catch (error) {
+    console.error('Error stopping automation:', error);
+    res.status(500).json({ error: 'Error al detener automatización' });
+  }
+});
+
+/**
+ * PUT /api/leads/:id/status
+ * Update lead status
+ */
+router.put('/:id/status', async (req, res) => {
+  try {
+    const { status, reason } = req.body;
+    
+    const validStatuses = ['nuevo', 'contactado', 'respondio', 'visita_agendada', 'visita_realizada', 'cerrado', 'perdido'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        error: 'Estado inválido',
+        validStatuses
+      });
+    }
+    
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId }
+    });
+    
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+
+    // Guardar historial de cambio de estado
+    await prisma.leadStatusHistory.create({
+      data: {
+        leadId: lead.id,
+        tenantId: lead.tenantId,
+        userId: req.user?.id || null,
+        previousStatus: lead.status,
+        newStatus: status,
+        reason: reason || null
+      }
+    });
+    
+    const updatedLead = await prisma.lead.update({
+      where: { id: req.params.id },
+      data: { 
+        status,
+        lastContact: ['contactado', 'respondio', 'visita_agendada', 'visita_realizada', 'cerrado'].includes(status) ? new Date() : undefined
+      }
+    });
+    
+    res.json({ success: true, lead: updatedLead });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({ error: 'Error al actualizar estado' });
+  }
+});
+
+/**
+ * Get lead timeline/history
+ */
+router.get('/:id/timeline', async (req, res) => {
+  try {
+    const lead = await prisma.lead.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId },
+      include: {
+        followUps: { orderBy: { scheduledAt: 'desc' } },
+        conversations: { 
+          include: { 
+            messages: { orderBy: { sentAt: 'asc' } } 
+          } 
+        }
+      }
+    });
+    
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead no encontrado' });
+    }
+    
+    // Build timeline from follow-ups (map to frontend format)
+    const timeline = lead.followUps.map(f => {
+      const label = f.type === 'automated' ? 'Mensaje automático' :
+                    f.type === 'automated_failed' ? 'Mensaje automático (falló)' :
+                    f.type === 'manual' ? 'Mensaje manual' :
+                    f.type || 'Seguimiento';
+      return {
+        id: f.id,
+        type: 'followup',
+        subtype: f.type,
+        label,
+        description: f.note || '',
+        message: f.note || '',
+        status: f.completedAt ? 'sent' : 'pending',
+        channel: lead.channel || 'whatsapp',
+        sentAt: f.createdAt,
+        scheduledAt: f.scheduledAt
+      };
+    });
+    
+    // Add conversation messages to timeline
+    lead.conversations.forEach(conv => {
+      conv.messages.forEach(msg => {
+        timeline.push({
+          id: msg.id,
+          type: 'message',
+          status: msg.direction === 'inbound' ? 'received' : 'sent',
+          label: msg.direction === 'inbound' ? 'Respuesta recibida' : 'Mensaje enviado',
+          description: msg.content || '',
+          message: msg.content || '',
+          channel: msg.channel,
+          sentAt: msg.sentAt
+        });
+      });
+    });
+    
+    // Sort by date
+    timeline.sort((a, b) => new Date(b.sentAt || b.scheduledAt || 0) - new Date(a.sentAt || a.scheduledAt || 0));
+    
+    res.json({ timeline });
+  } catch (error) {
+    console.error('Error getting timeline:', error);
+    res.status(500).json({ error: 'Error al obtener timeline' });
+  }
 });
 
 module.exports = router;
