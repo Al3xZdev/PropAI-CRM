@@ -158,8 +158,6 @@ function generateEmailVariations(property) {
     }
   };
 }
-  ];
-}
 
 /**
  * Generate 9 variations of social media copies
