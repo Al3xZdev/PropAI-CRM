@@ -102,11 +102,11 @@ export default function GeneratedContent({ content }) {
           <div className="bg-slate-800/50 p-4 rounded-lg space-y-3">
             <div>
               <p className="text-xs text-slate-500">Asunto:</p>
-              <p className="text-white font-medium">{content.emailMarketing?.subject}</p>
+              <p className="text-white font-medium">{content.emailMarketing?.content?.subject}</p>
             </div>
             <div>
               <p className="text-xs text-slate-500">Preheader:</p>
-              <p className="text-slate-300 text-sm">{content.emailMarketing?.preheader}</p>
+              <p className="text-slate-300 text-sm">{content.emailMarketing?.content?.preheader}</p>
             </div>
             <div className="pt-2 border-t border-slate-700">
               <p className="text-xs text-slate-500 mb-1">CTA:</p>

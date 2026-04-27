@@ -1,11 +1,65 @@
 import { useState, useEffect } from 'react'
 import { Sparkles, RefreshCw, Copy, CheckCheck, Image, Square, Mail } from 'lucide-react'
 
-export default function CopywritingContent({ property, platform }) {
+export default function CopywritingContent({ property, platform, content, variationIndex = 0 }) {
   const [generatedCopies, setGeneratedCopies] = useState({})
   const [copiedId, setCopiedId] = useState(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [activeFilter, setActiveFilter] = useState(platform === 'instagram' ? 'all' : 'post')
+
+  // Use backend content if available, otherwise fall back to templates
+  const useBackendContent = content && (
+    (platform === 'instagram' && content.socialCopies?.some(c => c.platform === 'instagram')) ||
+    (platform === 'facebook' && content.socialCopies?.some(c => c.platform === 'facebook')) ||
+    (platform === 'email' && content.emailMarketing != null)
+  )
+
+  // Get copies from backend content (limit to 3 per platform)
+  useEffect(() => {
+    if (!useBackendContent) return
+    
+    if (platform === 'instagram') {
+      const instaCopies = content.socialCopies
+        ?.filter(c => c.platform === 'instagram')
+        .slice(0, 3)  // Show max 3
+        .map((c, idx) => ({
+          id: c.id,
+          text: c.content?.caption || c.content?.message || '',
+          type: c.type || 'feed',
+          selected: idx === 0
+        })) || []
+      // Separate posts and stories
+      const posts = instaCopies.filter(c => c.type !== 'story')
+      const stories = instaCopies.filter(c => c.type === 'story')
+      setGeneratedCopies({ post: posts, story: stories })
+    } else if (platform === 'facebook') {
+      const fbCopies = content.socialCopies
+        ?.filter(c => c.platform === 'facebook')
+        .slice(0, 3)  // Show max 3
+        .map((c, idx) => ({
+          id: c.id,
+          text: c.content?.caption || c.content?.message || '',
+          selected: idx === 0
+        })) || []
+      setGeneratedCopies({ post: fbCopies })
+    } else if (platform === 'email') {
+      // Handle new single object structure: { id, content: { subject, body }, cta }
+      // with fallback for old array structure
+      const email = content.emailMarketing;
+      if (email) {
+        const emailObj = {
+          id: email.id,
+          subject: email.content?.subject || email.subject || '',
+          body: email.content?.body || email.body || '',
+          text: `${email.content?.subject || email.subject || ''}\n\n${email.content?.body || email.body || ''}`,
+          selected: true
+        };
+        setGeneratedCopies({ email: [emailObj] });
+      } else {
+        setGeneratedCopies({ email: [] });
+      }
+    }
+  }, [content, platform, useBackendContent])
 
   // Copy templates
   const instagramPostTemplates = [
@@ -97,8 +151,11 @@ export default function CopywritingContent({ property, platform }) {
     }, 500)
   }
 
-  // Initial generation
+  // Generate copies (fall back to templates if no backend content)
   useEffect(() => {
+    // Don't regenerate if we have backend content
+    if (useBackendContent) return
+    
     if (platform === 'instagram') {
       generateCopies('post')
       generateCopies('story')
@@ -107,7 +164,7 @@ export default function CopywritingContent({ property, platform }) {
     } else if (platform === 'email') {
       generateCopies('email')
     }
-  }, [platform, property?.id])
+  }, [platform, property?.id, useBackendContent])
 
   // Copy to clipboard
   const copyToClipboard = async (copyId, text) => {

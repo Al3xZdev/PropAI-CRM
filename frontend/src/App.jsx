@@ -5,6 +5,8 @@ import LeadsPage from './pages/LeadsPage'
 import AutomationPage from './pages/AutomationPage'
 import HistoryPage from './pages/HistoryPage'
 import LoginPage from './pages/LoginPage'
+import InboxPage from './pages/InboxPage'
+import AgentsPage from './pages/agents/AgentsPage'
 import PropertyForm from './components/PropertyForm'
 import ScheduleTimeline from './components/ScheduleTimeline'
 import SocialPreview from './components/SocialPreview'
@@ -14,8 +16,9 @@ import PublicationPanel from './components/PublicationPanel'
 import PublicationResult from './components/PublicationResult'
 import ScheduleModal from './components/ScheduleModal'
 import CopywritingContent from './components/CopywritingContent'
+import PropertyImportCSV from './components/PropertyImportCSV'
 import ScheduleSuccessPopup from './components/ScheduleSuccessPopup'
-import { NotificationsProvider, useNotifications, NOTIFICATION_TYPES } from './hooks/useNotifications'
+import { useNotifications, NOTIFICATION_TYPES } from './hooks/useNotifications'
 import { 
   Sparkles, Building2, FileText, Calendar, Eye, 
   Plus, Loader2, X, Copy, Send, ArrowLeft
@@ -38,6 +41,9 @@ function App() {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   
+  // Import modal
+  const [showImportModal, setShowImportModal] = useState(false)
+  
   // Publication result modal (global)
   const [showResult, setShowResult] = useState(false)
   const [resultStatus, setResultStatus] = useState('loading') // 'loading' | 'success' | 'error'
@@ -49,6 +55,9 @@ function App() {
   // Schedule success popup
   const [showScheduleSuccess, setShowScheduleSuccess] = useState(false)
   const [scheduleSuccessData, setScheduleSuccessData] = useState({ date: '', time: '', platforms: [] })
+  
+  // Content variation cycling
+  const [contentVariationIndex, setContentVariationIndex] = useState(0)
 
   // Check for existing auth on mount
   useEffect(() => {
@@ -405,23 +414,47 @@ function App() {
   }
 
   const regenerateAllCopies = async () => {
-    if (!selectedProperty) return
+    if (!selectedProperty || !content?.socialCopies) return
+    
+    // Cycle through existing variations instead of regenerating
     setIsGenerating(true)
     try {
-      const response = await fetch(`${API_URL}/content/generate/social`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ property: selectedProperty })
-      })
-      if (response.ok) {
-        const result = await response.json()
-        setContent(prev => ({ ...prev, socialCopies: result.copies }))
+      const allCopies = content.socialCopies
+      const currentIndex = contentVariationIndex
+      
+      // Group by platform
+      const instagram = allCopies.filter(c => c.platform === 'instagram')
+      const facebook = allCopies.filter(c => c.platform === 'facebook')
+      const tiktok = allCopies.filter(c => c.platform === 'tiktok')
+      
+      // Create rotated copies (shift by 1 within each platform group)
+      const rotated = []
+      
+      // Rotate Instagram (shift by 1)
+      for (let i = 0; i < instagram.length; i++) {
+        const nextIdx = (i + 1) % instagram.length
+        rotated.push({ ...instagram[nextIdx], id: `${instagram[nextIdx].id}-v${currentIndex + 1}` })
       }
+      
+      // Rotate Facebook
+      for (let i = 0; i < facebook.length; i++) {
+        const nextIdx = (i + 1) % facebook.length
+        rotated.push({ ...facebook[nextIdx], id: `${facebook[nextIdx].id}-v${currentIndex + 1}` })
+      }
+      
+      // Rotate TikTok
+      for (let i = 0; i < tiktok.length; i++) {
+        const nextIdx = (i + 1) % tiktok.length
+        rotated.push({ ...tiktok[nextIdx], id: `${tiktok[nextIdx].id}-v${currentIndex + 1}` })
+      }
+      
+      setContent(prev => ({ 
+        ...prev, 
+        socialCopies: rotated 
+      }))
+      setContentVariationIndex(prev => (prev + 1) % 3) // Cycle through 0, 1, 2
     } catch (err) {
-      setError('Error al regenerar copies')
+      setError('Error al ciclar variationes')
     } finally {
       setIsGenerating(false)
     }
@@ -460,7 +493,7 @@ function App() {
       case 'dashboard':
         return <Dashboard onNavigate={handleNavigate} />
       
-      case 'properties':
+case 'properties':
         return (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -468,13 +501,23 @@ function App() {
                 <h1 className="text-3xl font-bold text-white">Propiedades</h1>
                 <p className="text-slate-400 mt-1">{properties.length} propiedades</p>
               </div>
-              <button 
-                onClick={() => setCurrentPage('new-property')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-medium transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Nueva Propiedad
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setShowImportModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-white font-medium transition-colors"
+                  title="Importar propiedades desde CSV"
+                >
+                  <FileText className="w-5 h-5" />
+                  Importar
+                </button>
+                <button 
+                  onClick={() => setCurrentPage('new-property')}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-medium transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  Nueva Propiedad
+                </button>
+              </div>
             </div>
 
             {properties.length === 0 ? (
@@ -616,13 +659,17 @@ function App() {
                       <FileText className="w-5 h-5 text-blue-400" />
                       Descripción para Portal
                     </h3>
-                    <button onClick={() => copyToClipboard(content.portalDescription)} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm flex items-center gap-2">
-                      <Copy className="w-4 h-4" />
-                      Copiar
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => copyToClipboard(content.portalDescriptions?.[0]?.content?.description || content.portalDescriptions?.[0]?.content?.body || '')} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm flex items-center gap-2">
+                        <Copy className="w-4 h-4" />
+                        Copiar
+                      </button>
+                    </div>
                   </div>
                   <div className="bg-slate-700/50 p-4 rounded-xl min-h-32">
-                    <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">{content.portalDescription}</p>
+                    <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {content.portalDescriptions?.[0]?.content?.description || content.portalDescriptions?.[0]?.content?.body || 'Cargando descripción...'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -633,14 +680,28 @@ function App() {
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-pink-400" />
-                      Copias para Redes
+                      Copias para Redes (9 variaciones)
                     </h3>
                     <button onClick={regenerateAllCopies} disabled={isGenerating} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-lg text-sm disabled:opacity-50 flex items-center gap-2">
-                      {isGenerating ? 'Generando...' : 'Generar 3 Nuevas'}
+                      {isGenerating ? 'Generando...' : `Variación ${contentVariationIndex + 1} →`}
                     </button>
                   </div>
+                  
+                  {/*Platform tags */}
+                  <div className="flex gap-2 text-xs">
+                    <span className="px-2 py-1 bg-pink-500/20 text-pink-300 rounded">
+                      📸 Instagram: {content.socialCopies?.filter(c => c.platform === 'instagram').length}
+                    </span>
+                    <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded">
+                      📘 Facebook: {content.socialCopies?.filter(c => c.platform === 'facebook').length}
+                    </span>
+                    <span className="px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded">
+                      🎵 TikTok: {content.socialCopies?.filter(c => c.platform === 'tiktok').length}
+                    </span>
+                  </div>
+                  
                   <div className="grid md:grid-cols-3 gap-4">
-                    {content.socialCopies?.slice(0, 3).map(copy => (
+                    {content.socialCopies?.slice(0, 9).map(copy => (
                       <ContentCard key={copy.id} copy={copy} onCopy={() => copyToClipboard(copy.content.caption || copy.content.message)} />
                     ))}
                   </div>
@@ -655,7 +716,7 @@ function App() {
                   </div>
                   
                   {/* AI Copywriting Section */}
-                  <CopywritingContent property={selectedProperty} platform="instagram" />
+                  <CopywritingContent property={selectedProperty} platform="instagram" content={content} />
                 </div>
               )}
 
@@ -667,7 +728,7 @@ function App() {
                   </div>
                   
                   {/* AI Copywriting Section */}
-                  <CopywritingContent property={selectedProperty} platform="facebook" />
+                  <CopywritingContent property={selectedProperty} platform="facebook" content={content} />
                 </div>
               )}
 
@@ -679,7 +740,7 @@ function App() {
                   </div>
                   
                   {/* AI Copywriting Section */}
-                  <CopywritingContent property={selectedProperty} platform="email" />
+                  <CopywritingContent property={selectedProperty} platform="email" content={content} variationIndex={contentVariationIndex} />
                 </div>
               )}
 
@@ -703,6 +764,12 @@ function App() {
 
       case 'leads':
         return <LeadsPage onUpdateStats={loadLeadsStats} properties={properties} />
+
+      case 'inbox':
+        return <InboxPage />
+
+      case 'agents':
+        return <AgentsPage onNavigate={handleNavigate} />
 
       case 'automation':
         return <AutomationPage />
@@ -733,7 +800,6 @@ function App() {
   }
 
   return (
-    <NotificationsProvider>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Sidebar */}
         <Sidebar 
@@ -764,6 +830,16 @@ function App() {
           status={resultStatus}
           platform={resultPlatform}
           onClose={() => setShowResult(false)}
+        />
+        
+        {/* Property Import CSV Modal */}
+        <PropertyImportCSV
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onImportComplete={() => {
+            loadProperties()
+            setShowImportModal(false)
+          }}
         />
         
         {/* Schedule Modal for Manual Posts */}
@@ -811,7 +887,6 @@ function App() {
           data={scheduleSuccessData}
         />
       </div>
-    </NotificationsProvider>
   )
 }
 
