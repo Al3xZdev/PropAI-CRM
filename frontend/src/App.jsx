@@ -21,7 +21,7 @@ import ScheduleSuccessPopup from './components/ScheduleSuccessPopup'
 import { useNotifications, NOTIFICATION_TYPES } from './hooks/useNotifications'
 import { 
   Sparkles, Building2, FileText, Calendar, Eye, 
-  Plus, Loader2, X, Copy, Send, ArrowLeft
+  Plus, Loader2, X, Copy, Send, ArrowLeft, Search
 } from 'lucide-react'
 
 // API URL - uses relative path for Vercel deployment
@@ -58,6 +58,10 @@ function App() {
   
   // Content variation cycling
   const [contentVariationIndex, setContentVariationIndex] = useState(0)
+
+  // Properties search and filter
+  const [propertySearchQuery, setPropertySearchQuery] = useState('')
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState('all')
 
   // Check for existing auth on mount
   useEffect(() => {
@@ -487,6 +491,17 @@ function App() {
     { id: 'preview', label: 'Preview', icon: Eye }
   ]
 
+  // Filter properties based on search and type
+  const filteredProperties = properties.filter(property => {
+    const matchesSearch = propertySearchQuery === '' || 
+      (property.title?.toLowerCase().includes(propertySearchQuery.toLowerCase())) ||
+      (property.address?.toLowerCase().includes(propertySearchQuery.toLowerCase()))
+    
+    const matchesType = propertyTypeFilter === 'all' || property.propertyType === propertyTypeFilter
+    
+    return matchesSearch && matchesType
+  })
+
   // Render current page
   const renderPage = () => {
     switch (currentPage) {
@@ -520,7 +535,7 @@ case 'properties':
               </div>
             </div>
 
-            {properties.length === 0 ? (
+{properties.length === 0 ? (
               <div className="glass-card p-12 text-center">
                 <Building2 className="w-16 h-16 mx-auto mb-4 text-slate-600" />
                 <h3 className="text-xl font-semibold text-white mb-2">No hay propiedades</h3>
@@ -533,16 +548,63 @@ case 'properties':
                 </button>
               </div>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {properties.map(property => (
-                  <PropertyCard
-                    key={property.id}
-                    property={property}
-                    onClick={() => handleSelectProperty(property.id)}
-                    onDelete={(e) => handleDeleteProperty(property.id, e)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Search and Filter Bar */}
+                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                  {/* Search Input */}
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Buscar propiedades..."
+                      value={propertySearchQuery}
+                      onChange={(e) => setPropertySearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+                    />
+                  </div>
+                  
+                  {/* Type Filter Buttons */}
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'all', label: 'Todos' },
+                      { value: 'casa', label: 'Casas' },
+                      { value: 'departamento', label: 'Deptos' },
+                      { value: 'terreno', label: 'Terrenos' },
+                      { value: 'local', label: 'Locales' },
+                      { value: 'oficina', label: 'Oficinas' }
+                    ].map(filter => (
+                      <button
+                        key={filter.value}
+                        onClick={() => setPropertyTypeFilter(filter.value)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          propertyTypeFilter === filter.value
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Results count */}
+                <p className="text-slate-400 text-sm">
+                  {filteredProperties.length} de {properties.length} propiedades
+                </p>
+
+                {/* Properties Grid */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProperties.map(property => (
+                    <PropertyCard
+                      key={property.id}
+                      property={property}
+                      onClick={() => handleSelectProperty(property.id)}
+                      onDelete={(e) => handleDeleteProperty(property.id, e)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )
