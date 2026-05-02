@@ -1,0 +1,369 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id             String              @id @default(uuid())
+  name           String
+  slug           String              @unique
+  plan           String              @default("basic")
+  settings       Json                @default("{}")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  agencyConfig   AgencyConfig?
+  conversations  Conversation[]
+  documents      Document[]
+  folders        Folder[]
+  emails         Email[]
+  integrations   Integration[]
+  leads          Lead[]
+  statusHistory  LeadStatusHistory[]
+  notifications  Notification[]
+  properties     Property[]
+  scheduledPosts ScheduledPost[]
+  sequences      Sequence[]
+  users          User[]
+}
+
+model User {
+  id            String         @id @default(uuid())
+  tenantId      String
+  email         String
+  passwordHash  String
+  name          String
+  phone         String?
+  role          String         @default("agent") // admin, agent, manager
+  isActive      Boolean        @default(true)
+  permissions   Json?          // { leads: { read, write, delete }, properties: {...}, users: {...}, etc }
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[] @relation("AssignedConversations")
+  sentMessages  Message[]      @relation("SentMessages")
+  assignedLeads Lead[]         @relation("AssignedLeads")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+}
+
+model Lead {
+  id                   String              @id @default(uuid())
+  tenantId             String
+  name                 String
+  email                String?
+  phone                String?
+  channel              String?
+  status               String              @default("nuevo")
+  propertyInterest     String?
+  propertyId           String?
+  source               String?
+  notes                String?
+  assignedTo           String?
+  assignedAt           DateTime?
+  inAutomation         Boolean             @default(false)
+  automationPaused     Boolean             @default(false)
+  automationStartedAt  DateTime?
+  automationExitedAt   DateTime?
+  automationExitReason String?
+  createdAt            DateTime            @default(now())
+  lastContact          DateTime?
+  propertyTitle        String?
+  facebookId           String?
+  instagramId          String?
+  sourceDetail         String?
+  conversations        Conversation[]      @relation("LeadConversations")
+  documents            Document[]
+  folders              Folder[]
+  emails               Email[]
+  followUps            FollowUp[]
+  property             Property?           @relation(fields: [propertyId], references: [id])
+  tenant               Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedUser         User?               @relation("AssignedLeads", fields: [assignedTo], references: [id])
+  leadSequences        LeadSequence[]
+  statusHistory        LeadStatusHistory[]
+  messages             Message[]           @relation("LeadMessages")
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([assignedTo])
+  @@index([facebookId])
+  @@index([instagramId])
+  @@index([sourceDetail])
+}
+
+model Property {
+  id             String          @id @default(uuid())
+  tenantId       String
+  title          String
+  address        String?
+  price          Decimal?        @db.Decimal(15, 2)
+  area           Decimal?        @db.Decimal(10, 2)
+  bedrooms       Int?
+  bathrooms      Int?
+  propertyType   String?
+  description    String?
+  yearBuilt      Int?
+  floors         Int?
+  features       Json            @default("[]")
+  images         Json            @default("[]")
+  contentId      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  leads          Lead[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  scheduledPosts ScheduledPost[]
+  documents      Document[]
+
+  @@index([tenantId])
+}
+
+model Sequence {
+  id            String         @id @default(uuid())
+  tenantId      String
+  name          String
+  description   String?
+  isActive      Boolean        @default(true)
+  isPaused      Boolean        @default(false)
+  steps         Json
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  channel       String
+  leadSequences LeadSequence[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, channel])
+}
+
+model LeadSequence {
+  id          String    @id @default(uuid())
+  leadId      String
+  sequenceId  String
+  currentStep Int       @default(0)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  userId      String?
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sequence    Sequence  @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, sequenceId])
+}
+
+model FollowUp {
+  id          String    @id @default(uuid())
+  tenantId    String
+  leadId      String
+  createdBy   String
+  type        String
+  note        String?
+  scheduledAt DateTime
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, scheduledAt])
+  @@index([leadId])
+}
+
+model Conversation {
+  id           String    @id @default(uuid())
+  leadId       String
+  tenantId     String
+  channel      String
+  status       String    @default("active")
+  assignedTo   String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  assignedUser User?     @relation("AssignedConversations", fields: [assignedTo], references: [id])
+  lead         Lead      @relation("LeadConversations", fields: [leadId], references: [id], onDelete: Cascade)
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages     Message[] @relation("ConversationMessages")
+
+  @@index([tenantId])
+  @@index([leadId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  leadId         String
+  channel        String
+  direction      String
+  type           String       @default("text")
+  content        String?
+  mediaUrl       String?
+  externalId     String?
+  readAt         DateTime?
+  sentAt         DateTime     @default(now())
+  senderId       String?
+  conversation   Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  lead           Lead         @relation("LeadMessages", fields: [leadId], references: [id], onDelete: Cascade)
+  sender         User?        @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([leadId])
+}
+
+model Integration {
+  id        String   @id @default(uuid())
+  tenantId  String
+  provider  String
+  config    Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+}
+
+model ScheduledPost {
+  id           String    @id @default(uuid())
+  tenantId     String
+  propertyId   String?
+  content      String
+  platform     String
+  scheduledFor DateTime
+  status       String    @default("pending")
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  property     Property? @relation(fields: [propertyId], references: [id])
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, scheduledFor])
+  @@index([tenantId, status])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  type        String
+  title       String
+  description String?
+  leadId      String?
+  channel     String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, userId])
+  @@index([tenantId, read])
+}
+
+model Email {
+  id        String   @id @default(uuid())
+  tenantId  String
+  leadId    String?
+  userId    String
+  direction String
+  from      String
+  to        String
+  subject   String
+  body      String
+  html      String?
+  messageId String?
+  status    String   @default("sent")
+  channel   String   @default("email")
+  createdAt DateTime @default(now())
+  lead      Lead?    @relation(fields: [leadId], references: [id])
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, leadId])
+  @@index([tenantId, createdAt])
+  @@index([direction])
+}
+
+model LeadStatusHistory {
+  id             String   @id @default(uuid())
+  leadId         String
+  tenantId       String
+  userId         String?
+  previousStatus String?
+  newStatus      String
+  reason         String?
+  createdAt      DateTime @default(now())
+  lead           Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([leadId])
+  @@index([tenantId, createdAt])
+}
+
+// Folder model - For organizing documents in hierarchical folders
+model Folder {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  parentId    String?          // ✅ null = carpeta raíz, string = subcarpeta
+  color       String?         @default("#3B82F6")
+  leadId      String?         // ✅ Opcional - carpeta puede no estar vinculada a un lead
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  lead        Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  parent      Folder?         @relation("FolderTree", fields: [parentId], references: [id])
+  children    Folder[]        @relation("FolderTree")
+  documents   Document[]
+
+  @@index([tenantId])
+  @@index([parentId])
+  @@index([leadId])
+}
+
+model Document {
+  id           String   @id @default(uuid())
+  tenantId     String
+  leadId       String?
+  propertyId   String?
+  folderId     String?  // ✅ Nueva columna - carpeta del documento
+  name         String?  // nombre visible del documento
+  filename     String
+  filePath     String
+  url          String?  // URL pública del archivo
+  storage      String   @default("cloudinary") // cloudinary | supabase
+  mimeType     String?
+  fileSize     Int?
+  status       String   @default("draft") // draft | pending | signed | expired | rejected
+  uploadType   String   @default("uploaded") // uploaded | generated
+  contractType String?  // buy | rent | reserve (para contratos)
+  expiresAt    DateTime? // fecha de vencimiento opcional
+  notes        String?  // observaciones
+  formSnapshot Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lead         Lead?    @relation(fields: [leadId], references: [id])
+  property     Property? @relation(fields: [propertyId], references: [id])
+  folder      Folder?   @relation(fields: [folderId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([leadId])
+  @@index([propertyId])
+  @@index([folderId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AgencyConfig {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  cuit      String?
+  license   String?
+  agentName String?
+  logoUrl   String?
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+}
