@@ -1,0 +1,370 @@
+{
+  "name": "IG POST ONLY - Production",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publish-post",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-600, 400],
+      "id": "wh-trigger",
+      "name": "Webhook Trigger",
+      "webhookId": "publish-post-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "n1", "name": "node", "value": "={{ $json.node ?? '17841480468406561' }}", "type": "string" },
+            { "id": "n2", "name": "image_url", "value": "={{ $json.image_url ?? '' }}", "type": "string" },
+            { "id": "n3", "name": "video_url", "value": "={{ $json.video_url ?? '' }}", "type": "string" },
+            { "id": "n4", "name": "caption", "value": "={{ $json.caption ?? '' }}", "type": "string" },
+            { "id": "n5", "name": "cover_image", "value": "={{ $json.cover_image ?? '' }}", "type": "string" },
+            { "id": "n6", "name": "property_id", "value": "={{ $json.property_id ?? '' }}", "type": "string" },
+            { "id": "n7", "name": "schedule_id", "value": "={{ $json.schedule_id ?? '' }}", "type": "string" },
+            { "id": "n8", "name": "post_type", "value": "={{ $json.post_type ?? ($json.video_url ? 'http_reel' : 'http_image') }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-300, 400],
+      "id": "normalize",
+      "name": "Normalize Input"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.post_type }}", "rightValue": "http_image", "operator": { "type": "string", "operation": "equals" }, "id": "r1" }], "combinator": "and" }, "renameOutput": true, "outputKey": "HTTP Image" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.post_type }}", "rightValue": "fb_image", "operator": { "type": "string", "operation": "equals" }, "id": "r2" }], "combinator": "and" }, "renameOutput": true, "outputKey": "FB Image" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.post_type }}", "rightValue": "http_story_image", "operator": { "type": "string", "operation": "equals" }, "id": "r3" }], "combinator": "and" }, "renameOutput": true, "outputKey": "HTTP Story Image" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.post_type }}", "rightValue": "http_story_video", "operator": { "type": "string", "operation": "equals" }, "id": "r4" }], "combinator": "and" }, "renameOutput": true, "outputKey": "HTTP Story Video" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.post_type }}", "rightValue": "fb_story_image", "operator": { "type": "string", "operation": "equals" }, "id": "r5" }], "combinator": "and" }, "renameOutput": true, "outputKey": "FB Story Image" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.post_type }}", "rightValue": "http_reel", "operator": { "type": "string", "operation": "equals" }, "id": "r6" }], "combinator": "and" }, "renameOutput": true, "outputKey": "HTTP Reel" },
+            { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.post_type }}", "rightValue": "fb_reel", "operator": { "type": "string", "operation": "equals" }, "id": "r7" }], "combinator": "and" }, "renameOutput": true, "outputKey": "FB Reel" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [0, 400],
+      "id": "router",
+      "name": "Content Router"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v23.0/' + $json.node + '/media' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "image_url", "value": "={{ $json.image_url }}" }, { "name": "caption", "value": "={{ $json.caption }}" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [400, -200],
+      "id": "c-ig-img",
+      "name": "Container IG Image"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "={{ $json.node }}",
+        "edge": "media",
+        "options": { "queryParameters": { "parameter": [{ "name": "caption", "value": "={{ $json.caption }}" }, { "name": "image_url", "value": "={{ $json.image_url }}" }] } }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [400, 0],
+      "id": "c-fb-img",
+      "name": "Container FB Image"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v23.0/' + $json.node + '/media' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "media_type", "value": "STORIES" }, { "name": "image_url", "value": "={{ $json.image_url }}" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [400, 200],
+      "id": "c-ig-story-img",
+      "name": "Container IG Story Image"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v23.0/' + $json.node + '/media' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "media_type", "value": "STORIES" }, { "name": "video_url", "value": "={{ $json.video_url }}" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [400, 400],
+      "id": "c-ig-story-vid",
+      "name": "Container IG Story Video"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "={{ $json.node }}",
+        "edge": "media",
+        "options": { "queryParameters": { "parameter": [{ "name": "caption", "value": "={{ $json.caption }}" }, { "name": "image_url", "value": "={{ $json.image_url }}" }, { "name": "media_type", "value": "STORIES" }] } }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [400, 600],
+      "id": "c-fb-story-img",
+      "name": "Container FB Story Image"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v23.0/' + $json.node + '/media' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "media_type", "value": "REELS" }, { "name": "video_url", "value": "={{ $json.video_url }}" }, { "name": "caption", "value": "={{ $json.caption }}" }, { "name": "cover_url", "value": "={{ $json.cover_image }}" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [400, 800],
+      "id": "c-ig-reel",
+      "name": "Container IG Reel"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "={{ $json.node }}",
+        "edge": "media",
+        "options": { "queryParameters": { "parameter": [{ "name": "video_url", "value": "={{ $json.video_url }}" }, { "name": "media_type", "value": "REELS" }, { "name": "caption", "value": "={{ $json.caption }}" }] } }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [400, 1000],
+      "id": "c-fb-reel",
+      "name": "Container FB Reel"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "e1", "name": "container_id", "value": "={{ $json.id }}", "type": "string" },
+            { "id": "e2", "name": "node", "value": "={{ $('Normalize Input').item.json.node }}", "type": "string" },
+            { "id": "e3", "name": "post_type", "value": "={{ $('Normalize Input').item.json.post_type }}", "type": "string" },
+            { "id": "e4", "name": "property_id", "value": "={{ $('Normalize Input').item.json.property_id }}", "type": "string" },
+            { "id": "e5", "name": "schedule_id", "value": "={{ $('Normalize Input').item.json.schedule_id }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, 400],
+      "id": "extract-id",
+      "name": "Extract Container ID"
+    },
+    {
+      "parameters": { "waitAmount": 10, "unit": "seconds" },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1000, 400],
+      "id": "init-wait",
+      "name": "Initial Wait",
+      "webhookId": "init-wait-wh-001"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://graph.facebook.com/v23.0/' + $json.container_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "fields", "value": "status_code" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1200, 400],
+      "id": "check-status",
+      "name": "Check Processing Status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [{ "id": "ready-check", "leftValue": "={{ $json.status_code }}", "rightValue": "FINISHED", "operator": { "type": "string", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1400, 400],
+      "id": "is-ready",
+      "name": "Is Container Ready?"
+    },
+    {
+      "parameters": { "waitAmount": 15, "unit": "seconds" },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1600, 550],
+      "id": "retry-wait",
+      "name": "Retry Wait",
+      "webhookId": "retry-wait-wh-001"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [{ "id": "http-check", "leftValue": "={{ $json.post_type.split('_')[0] }}", "rightValue": "http", "operator": { "type": "string", "operation": "equals" } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1600, 250],
+      "id": "publish-router",
+      "name": "HTTPS vs FB Router"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v23.0/' + $json.node + '/media_publish' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "creation_id", "value": "={{ $json.container_id }}" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1900, 150],
+      "id": "pub-https",
+      "name": "Publish via HTTPS (IG)"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "={{ $json.node }}",
+        "edge": "media_publish",
+        "options": { "queryParameters": { "parameter": [{ "name": "creation_id", "value": "={{ $json.container_id }}" }] } }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [1900, 400],
+      "id": "pub-fb",
+      "name": "Publish via Facebook SDK"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "resp-ok", "name": "response", "value": "={{ { \"success\": true, \"published\": true, \"post_id\": $json.id, \"post_type\": $(\"Normalize Input\").item.json.post_type, \"property_id\": $(\"Normalize Input\").item.json.property_id, \"schedule_id\": $(\"Normalize Input\").item.json.schedule_id, \"platform\": $(\"Normalize Input\").item.json.post_type.startsWith(\"fb\") ? \"facebook\" : \"instagram\", \"timestamp\": $now.toISO() } }}", "type": "object" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2100, 250],
+      "id": "build-response",
+      "name": "Build Success Response"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "resp-err", "name": "response", "value": "={{ { \"success\": false, \"published\": false, \"error\": \"Processing timeout - status: \" + $json.status_code, \"post_type\": $(\"Normalize Input\").item.json.post_type, \"property_id\": $(\"Normalize Input\").item.json.property_id, \"schedule_id\": $(\"Normalize Input\").item.json.schedule_id, \"timestamp\": $now.toISO() } }}", "type": "object" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1600, 750],
+      "id": "build-error",
+      "name": "Build Error Response"
+    },
+    {
+      "parameters": {
+        "statusCode": 200,
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [2300, 400],
+      "id": "respond-wh",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": { "main": [[{ "node": "Normalize Input", "type": "main", "index": 0 }]] },
+    "Normalize Input": { "main": [[{ "node": "Content Router", "type": "main", "index": 0 }]] },
+    "Content Router": {
+      "main": [
+        [{ "node": "Container IG Image", "type": "main", "index": 0 }],
+        [{ "node": "Container FB Image", "type": "main", "index": 0 }],
+        [{ "node": "Container IG Story Image", "type": "main", "index": 0 }],
+        [{ "node": "Container IG Story Video", "type": "main", "index": 0 }],
+        [{ "node": "Container FB Story Image", "type": "main", "index": 0 }],
+        [{ "node": "Container IG Reel", "type": "main", "index": 0 }],
+        [{ "node": "Container FB Reel", "type": "main", "index": 0 }]
+      ]
+    },
+    "Container IG Image": { "main": [[{ "node": "Extract Container ID", "type": "main", "index": 0 }]] },
+    "Container FB Image": { "main": [[{ "node": "Extract Container ID", "type": "main", "index": 0 }]] },
+    "Container IG Story Image": { "main": [[{ "node": "Extract Container ID", "type": "main", "index": 0 }]] },
+    "Container IG Story Video": { "main": [[{ "node": "Extract Container ID", "type": "main", "index": 0 }]] },
+    "Container FB Story Image": { "main": [[{ "node": "Extract Container ID", "type": "main", "index": 0 }]] },
+    "Container IG Reel": { "main": [[{ "node": "Extract Container ID", "type": "main", "index": 0 }]] },
+    "Container FB Reel": { "main": [[{ "node": "Extract Container ID", "type": "main", "index": 0 }]] },
+    "Extract Container ID": { "main": [[{ "node": "Initial Wait", "type": "main", "index": 0 }]] },
+    "Initial Wait": { "main": [[{ "node": "Check Processing Status", "type": "main", "index": 0 }]] },
+    "Check Processing Status": { "main": [[{ "node": "Is Container Ready?", "type": "main", "index": 0 }]] },
+    "Is Container Ready?": {
+      "main": [
+        [{ "node": "HTTPS vs FB Router", "type": "main", "index": 0 }],
+        [{ "node": "Retry Wait", "type": "main", "index": 0 }]
+      ]
+    },
+    "Retry Wait": { "main": [[{ "node": "Check Processing Status", "type": "main", "index": 0 }]] },
+    "HTTPS vs FB Router": {
+      "main": [
+        [{ "node": "Publish via HTTPS (IG)", "type": "main", "index": 0 }],
+        [{ "node": "Publish via Facebook SDK", "type": "main", "index": 0 }]
+      ]
+    },
+    "Publish via HTTPS (IG)": { "main": [[{ "node": "Build Success Response", "type": "main", "index": 0 }]] },
+    "Publish via Facebook SDK": { "main": [[{ "node": "Build Success Response", "type": "main", "index": 0 }]] },
+    "Build Success Response": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "saveManualExecutions": true
+  }
+}
