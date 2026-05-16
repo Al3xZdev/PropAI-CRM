@@ -27,6 +27,7 @@ model Tenant {
   scheduledPosts ScheduledPost[]
   sequences      Sequence[]
   users          User[]
+  auditLogs      AuditLog[]
 }
 
 model User {
@@ -45,6 +46,7 @@ model User {
   sentMessages  Message[]      @relation("SentMessages")
   assignedLeads Lead[]         @relation("AssignedLeads")
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  auditLogs     AuditLog[]    @relation("UserAuditLogs")
 
   @@unique([tenantId, email])
 }
@@ -366,4 +368,38 @@ model AgencyConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// Audit Trail - Registro de acciones importantes
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String?
+  userEmail   String?
+  userName    String?
+  userRole    String?
+  
+  // Action details
+  action      String   // login, logout, create, update, delete, etc.
+  resource    String   // leads, properties, users, etc.
+  resourceId  String?  // ID del recurso afectado
+  details     Json?    // { before: {}, after: {} }
+  
+  // Metadata
+  ipAddress   String?
+  userAgent   String?
+  success     Boolean  @default(true)
+  errorMessage String?
+  
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  user        User?    @relation("UserAuditLogs", fields: [userId], references: [id])
+  
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
 }

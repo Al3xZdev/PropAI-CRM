@@ -7,6 +7,7 @@ import HistoryPage from './pages/HistoryPage'
 import LoginPage from './pages/LoginPage'
 import InboxPage from './pages/InboxPage'
 import AgentsPage from './pages/agents/AgentsPage'
+import DocumentsPage from './pages/DocumentsPage'
 import PropertyForm from './components/PropertyForm'
 import ScheduleTimeline from './components/ScheduleTimeline'
 import SocialPreview from './components/SocialPreview'
@@ -69,16 +70,16 @@ function App() {
   }, [])
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('accessToken')
+    // Ya no usamos localStorage para tokens (están en cookies httpOnly)
+    // Pero necesitamos el stored user para la UI
     const storedUser = localStorage.getItem('user')
     
-    if (token && storedUser) {
+    if (storedUser) {
       try {
-        // Verify token is still valid
+        // Verificar que el token de la cookie sigue siendo válido
+        // Usamos credentials: 'include' para que se envíen las cookies automáticamente
         const response = await fetch(`${API_URL}/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          credentials: 'include' // Importante: enviar cookies
         })
         
         if (response.ok) {
@@ -88,10 +89,10 @@ function App() {
           const mergedUser = { ...stored, ...apiUser.user }
           setUser(mergedUser)
           localStorage.setItem('user', JSON.stringify(mergedUser))
-          loadProperties(token)
-          loadLeadsStats(token)
+          loadProperties()
+          loadLeadsStats()
         } else {
-          // Token invalid, clear storage
+          // Token inválido o expirado
           logout()
         }
       } catch (err) {
@@ -108,10 +109,20 @@ function App() {
     loadLeadsStats()
   }
 
-  const logout = () => {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
+  const logout = async () => {
+    // Llamar al backend para invalidar el refresh token y limpiar cookies
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      })
+    } catch (e) {
+      // Ignorar errores en logout
+    }
+    
+    // Limpiar solo datos de usuario (los tokens ya están en cookies httpOnly)
     localStorage.removeItem('user')
+    localStorage.removeItem('tenant')
     setUser(null)
     setProperties([])
     setSelectedProperty(null)
@@ -120,19 +131,23 @@ function App() {
     setLeadsStats({})
   }
 
-  // Helper to get auth headers
+  // Helper to get auth headers - usa cookies automáticamente
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('accessToken')
+    // Ya no necesitamos el token del localStorage porque:
+    // 1. Las cookies httpOnly se envían automáticamente con credentials: 'include'
+    // 2. El backend acepta tanto cookies como Authorization header (fallback)
     return {
-      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     }
   }
 
-  const loadProperties = async (token) => {
+  const loadProperties = async () => {
     try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : getAuthHeaders()
-      const response = await fetch(`${API_URL}/properties`, { headers })
+      // Las cookies se envían automáticamente con credentials: 'include'
+      const response = await fetch(`${API_URL}/properties`, { 
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      })
       if (response.ok) {
         const data = await response.json()
         setProperties(data.properties || [])
@@ -144,10 +159,13 @@ function App() {
     }
   }
 
-  const loadLeadsStats = async (token) => {
+  const loadLeadsStats = async () => {
     try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : getAuthHeaders()
-      const response = await fetch(`${API_URL}/leads/stats/summary`, { headers })
+      // Las cookies se envían automáticamente con credentials: 'include'
+      const response = await fetch(`${API_URL}/leads/stats/summary`, { 
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      })
       if (response.ok) {
         const data = await response.json()
         setLeadsStats(data)
@@ -838,6 +856,9 @@ case 'properties':
 
       case 'history':
         return <HistoryPage />
+
+      case 'documents':
+        return <DocumentsPage onNavigate={handleNavigate} />
 
       default:
         return <Dashboard onNavigate={handleNavigate} />

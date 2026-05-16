@@ -38,6 +38,29 @@ function initializeTables() {
     )
   `);
 
+  // Notifications table
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      lead_id TEXT,
+      channel TEXT,
+      read INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  try {
+    database.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`);
+  } catch (e) { /* ignore */ }
+  try {
+    database.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read)`);
+  } catch (e) { /* ignore */ }
+
   // Create indexes (ignore errors if columns don't exist yet)
   try {
     database.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
@@ -50,6 +73,7 @@ function initializeTables() {
   } catch (e) { /* ignore */ }
 
   console.log('✅ Users table initialized');
+  console.log('✅ Notifications table initialized');
 }
 
 // User operations
@@ -58,7 +82,7 @@ const UserDB = {
     const database = getDatabase();
     const { v4: uuidv4 } = require('uuid');
     const id = uuidv4();
-    const hashedPassword = password ? bcrypt.hashSync(password, 10) : null;
+    const hashedPassword = password ? bcrypt.hashSync(password, 12) : null;
     
     const stmt = database.prepare(`
       INSERT INTO users (id, email, password, name, auth_provider)
@@ -146,7 +170,7 @@ const UserDB = {
 
   updatePassword: (userId, newPassword) => {
     const database = getDatabase();
-    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    const hashedPassword = bcrypt.hashSync(newPassword, 12);
     const stmt = database.prepare('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
     return stmt.run(hashedPassword, userId);
   },
@@ -170,4 +194,74 @@ const UserDB = {
   }
 };
 
-module.exports = { getDatabase, UserDB };
+// Notification operations
+const NotificationDB = {
+  create: (userId, type, title, message, leadId = null, channel = null) => {
+    const database = getDatabase();
+    const { v4: uuidv4 } = require('uuid');
+    const id = uuidv4();
+    
+    const stmt = database.prepare(`
+      INSERT INTO notifications (id, user_id, type, title, message, lead_id, channel)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    stmt.run(id, userId, type, title, message, leadId, channel);
+    return { id, user_id: userId, type, title, message, lead_id: leadId, channel };
+  },
+
+  getByUser: (userId, limit = 50) => {
+    const database = getDatabase();
+    const stmt = database.prepare(`
+      SELECT * FROM notifications 
+      WHERE user_id = ? 
+      ORDER BY created_at DESC 
+      LIMIT ?
+    `);
+    return stmt.all(userId, limit);
+  },
+
+  // Get all notifications (including system notifications)
+  getAll: (limit = 50) => {
+    const database = getDatabase();
+    const stmt = database.prepare(`
+      SELECT * FROM notifications 
+      ORDER BY created_at DESC 
+      LIMIT ?
+    `);
+    return stmt.all(limit);
+  },
+
+  getUnreadCount: (userId) => {
+    const database = getDatabase();
+    const stmt = database.prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0');
+    const result = stmt.get(userId);
+    return result?.count || 0;
+  },
+
+  markAsRead: (notificationId, userId) => {
+    const database = getDatabase();
+    const stmt = database.prepare('UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?');
+    return stmt.run(notificationId, userId);
+  },
+
+  markAllAsRead: (userId) => {
+    const database = getDatabase();
+    const stmt = database.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?');
+    return stmt.run(userId);
+  },
+
+  delete: (notificationId, userId) => {
+    const database = getDatabase();
+    const stmt = database.prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?');
+    return stmt.run(notificationId, userId);
+  },
+
+  deleteAll: (userId) => {
+    const database = getDatabase();
+    const stmt = database.prepare('DELETE FROM notifications WHERE user_id = ?');
+    return stmt.run(userId);
+  }
+};
+
+module.exports = { getDatabase, UserDB, NotificationDB };
