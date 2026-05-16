@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -33,6 +35,10 @@ const automationRoutes = require('./routes/automation');
 const chatRoutes = require('./routes/chat');
 const notificationRoutes = require('./routes/notifications');
 const contractRoutes = require('./routes/contracts');
+const followupRoutes = require('./routes/followups');
+const statsRoutes = require('./routes/stats');
+const documentRoutes = require('./routes/documents');
+const folderRoutes = require('./routes/folders');
 const { testConnection } = require('./services/cloudinaryService');
 const { testInstagramConnection } = require('./services/instagramPublisher');
 const { requireAuth } = require('./middleware/auth');
@@ -40,13 +46,40 @@ const { requireAuth } = require('./middleware/auth');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Middleware - Security headers (Helmet)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.supabase.co"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: {
+    action: 'deny'
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+}));
+
 // Middleware - CORS with Authorization header support
 app.use(cors({
   origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Middleware - Parse cookies for auth
+app.use(cookieParser());
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -70,8 +103,8 @@ const upload = multer({
 // Make upload middleware available to routes
 app.set('upload', upload);
 
-// Public routes (no auth required) - with rate limiting
-app.use('/api/auth', authRateLimit(5, 15 * 60 * 1000), authRoutes);
+// Public routes (no auth required) - with rate limiting (10 intentos por 15 min)
+app.use('/api/auth', authRateLimit(10, 15 * 60 * 1000), authRoutes);
 
 // Chat routes - MIXTO: webhooks públicos, resto protegido
 app.use('/api/chat', chatRoutes);
@@ -84,7 +117,16 @@ app.use('/api/leads', generalRateLimit(100, 60000), requireAuth, leadRoutes);
 app.use('/api/automation', generalRateLimit(100, 60000), requireAuth, automationRoutes);
 app.use('/api/notifications', generalRateLimit(100, 60000), requireAuth, notificationRoutes);
 app.use('/api/emails', generalRateLimit(100, 60000), requireAuth, require('./routes/emails'));
-app.use('/api/contracts', generalRateLimit(100, 60000), requireAuth, contractRoutes);
+// Contracts: SIN requireAuth global — el router maneja su propia auth
+// (el endpoint /download/:id acepta el token como ?token= query param)
+app.use('/api/contracts', generalRateLimit(100, 60000), contractRoutes);
+app.use('/api/followups', generalRateLimit(100, 60000), requireAuth, followupRoutes);
+app.use('/api/stats', generalRateLimit(100, 60000), requireAuth, statsRoutes);
+// Permissions: solo admins pueden gestionar roles
+app.use('/api/permissions', generalRateLimit(100, 60000), requireAuth, require('./routes/permissions'));
+app.use('/api/assignment', generalRateLimit(100, 60000), requireAuth, require('./routes/assignment'));
+app.use('/api/documents', generalRateLimit(100, 60000), requireAuth, documentRoutes);
+app.use('/api/folders', generalRateLimit(100, 60000), requireAuth, folderRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

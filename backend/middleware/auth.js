@@ -5,9 +5,9 @@ const { prisma } = require('../services/db');
 const JWT_SECRET = process.env.JWT_SECRET || 'real-estate-crm-secret-key-2024';
 
 /**
- * Extract token from Authorization header
+ * Extract token from Authorization header (backward compatibility)
  */
-function extractToken(authHeader) {
+function extractTokenFromHeader(authHeader) {
   if (!authHeader) return null;
   
   const parts = authHeader.split(' ');
@@ -16,6 +16,26 @@ function extractToken(authHeader) {
   }
   
   return parts[1];
+}
+
+/**
+ * Extract token from cookie (nuevo método seguro)
+ */
+function extractTokenFromCookie(cookies) {
+  if (!cookies) return null;
+  return cookies.accessToken || null;
+}
+
+/**
+ * Extract token - Prioriza cookie, acepta header como fallback
+ */
+function extractToken(req) {
+  // Primero intentar de cookies (más seguro)
+  const cookieToken = extractTokenFromCookie(req.cookies);
+  if (cookieToken) return cookieToken;
+  
+  // Fallback al header Authorization (backward compatibility)
+  return extractTokenFromHeader(req.headers.authorization);
 }
 
 /**
@@ -31,9 +51,10 @@ function verifyToken(token) {
 
 /**
  * Main authentication middleware
+ * Lee el token de la cookie httpOnly (seguro contra XSS)
  */
 async function requireAuth(req, res, next) {
-  const token = extractToken(req.headers.authorization);
+  const token = extractToken(req);
   
   if (!token) {
     return res.status(401).json({ 
@@ -46,7 +67,7 @@ async function requireAuth(req, res, next) {
   
   if (!decoded) {
     return res.status(401).json({ 
-      error: 'Token inválido o expirado',
+      error: 'Token inválido o expirado. Iniciá sesión nuevamente.',
       code: 'INVALID_TOKEN'
     });
   }
@@ -68,7 +89,7 @@ async function requireAuth(req, res, next) {
  * Optional authentication - doesn't fail if no token
  */
 async function optionalAuth(req, res, next) {
-  const token = extractToken(req.headers.authorization);
+  const token = extractToken(req);
   
   if (token) {
     const decoded = verifyToken(token);
