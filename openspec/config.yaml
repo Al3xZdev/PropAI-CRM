@@ -1,0 +1,28 @@
+project: DemoRealState
+stack:
+  backend: Express.js + Prisma (PostgreSQL via Supabase)
+  frontend: React 18 + Vite + Tailwind CSS 3
+  language: JavaScript (backend), JSX (frontend)
+  database: PostgreSQL (Supabase)
+strict_tdd: false
+testing:
+  runner: none
+  unit: false
+  integration: false
+  e2e: false
+  coverage: false
+  note: No testing framework detected. Manual testing only.
+persistence: openspec
+phase_rules:
+  proposal: Explore intent, scope, approach before committing to implementation.
+  spec: Write delta specs with requirements and scenarios.
+  design: Technical design and architecture approach.
+  tasks: Break into implementation tasks with clear boundaries.
+  apply: Implement tasks, one batch at a time.
+  verify: Validate implementation against specs.
+  archive: Sync delta specs and persist final state.
+context: >
+  Real Estate SaaS CRM with multi-tenant support. Backend serves Express.js API
+  on port 3001 with JWT auth, Prisma ORM, and Supabase PostgreSQL. Frontend is
+  a React SPA with Vite and Tailwind. Features include lead management, properties,
+  content generation, scheduling, contracts, and Meta integrations (WhatsApp, Instagram, Facebook).

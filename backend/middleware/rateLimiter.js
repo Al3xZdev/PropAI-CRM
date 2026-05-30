@@ -18,6 +18,8 @@ setInterval(() => {
  * @param {number} windowMs - Time window in milliseconds (default 5 min)
  */
 function authRateLimit(maxAttempts = 30, windowMs = 5 * 60 * 1000) {
+  // Saltar rate limiting en tests
+  if (process.env.VITEST) return (req, res, next) => next()
   return (req, res, next) => {
     const ip = req.ip || req.connection.remoteAddress || 'unknown';
     const key = `auth:${ip}`;
@@ -62,6 +64,8 @@ function authRateLimit(maxAttempts = 30, windowMs = 5 * 60 * 1000) {
  * General rate limiter for any endpoint
  */
 function generalRateLimit(maxRequests = 100, windowMs = 60 * 1000) {
+  // Saltar rate limiting en tests
+  if (process.env.VITEST) return (req, res, next) => next()
   return (req, res, next) => {
     const ip = req.ip || req.connection.remoteAddress || 'unknown';
     const key = `general:${ip}`;

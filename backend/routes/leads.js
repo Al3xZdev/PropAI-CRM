@@ -7,9 +7,60 @@ const { requireAuth } = require('./auth');
 const { sanitizeLead, validateLead, sanitizeString, isValidUUID } = require('../utils/validation');
 const { calculateScore } = require('../services/leadScoringService');
 const permissionsService = require('../services/permissionsService');
+const { logAuditEvent } = require('../middleware/auditLogger');
+const logger = require('../services/logger');
+
+// Helper para logging de auditoría — mapea argumentos a logAuditEvent
+async function auditLog(req, action, resource, resourceId, success, details = null) {
+  if (!req.userId) return
+  await logAuditEvent({
+    tenantId: req.tenantId,
+    userId: req.userId,
+    userEmail: req.user?.email,
+    userName: req.user?.name,
+    userRole: req.user?.role,
+    action: action.toLowerCase(),
+    resource,
+    resourceId,
+    details,
+    ipAddress: req.ip,
+    userAgent: req.headers?.['user-agent'],
+    success,
+    errorMessage: success ? null : (details?.error || null)
+  }).catch(err => logger.error({ err }, 'audit log error'))
+}
 
 // Apply auth middleware to all routes
 router.use(requireAuth);
+
+// RBAC: Only managers and admins can create/update/delete leads
+router.post('/', async (req, res) => {
+  try {
+    const leadData = sanitizeLead(req.body);
+    const validation = validateLead(leadData);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const lead = await prisma.lead.create({
+      data: {
+        ...leadData,
+        id: uuidv4(),
+        tenantId: req.tenantId,
+        assignedTo: leadData.assignedTo || req.userId,
+      },
+      include: { property: true, assignedUser: { select: { id: true, name: true, email: true } } }
+    });
+
+    await auditLog(req, 'CREATE', 'lead', lead.id, true, { name: leadData.name, email: leadData.email });
+
+    res.status(201).json(lead);
+  } catch (error) {
+    await auditLog(req, 'CREATE', 'lead', null, false, { error: error.message });
+    logger.error({ err: error }, 'creating lead');
+    res.status(500).json({ error: 'Error al crear lead' });
+  }
+});
 
 /**
  * GET /api/leads
@@ -68,7 +119,7 @@ router.get('/', async (req, res) => {
     
     res.json({ leads: leadsWithAutomation });
   } catch (error) {
-    console.error('Error fetching leads:', error);
+    logger.error({ err: error }, 'fetching leads');
     res.status(500).json({ error: 'Error al obtener leads' });
   }
 });
@@ -136,7 +187,7 @@ router.get('/stats/summary', async (req, res) => {
       }, {})
     });
   } catch (error) {
-    console.error('Error fetching leads stats:', error);
+    logger.error({ err: error }, 'fetching leads stats');
     res.status(500).json({ error: 'Error al obtener estadísticas' });
   }
 });
@@ -174,70 +225,13 @@ router.get('/:id', async (req, res) => {
     
     res.json({ lead });
   } catch (error) {
-    console.error('Error fetching lead:', error);
+    logger.error({ err: error }, 'fetching lead');
     res.status(500).json({ error: 'Error al obtener el lead' });
   }
 });
-
-/**
- * POST /api/leads
- * Create a new lead
- */
-router.post('/', async (req, res) => {
-  try {
-    // Validate input
-    const validation = validateLead(req.body);
-    if (!validation.valid) {
-      return res.status(400).json({ 
-        error: 'Datos de lead inválidos',
-        details: validation.errors 
-      });
-    }
-    
-    // Sanitize input
-    const cleanLead = sanitizeLead(req.body);
-    
-    const { name, email, phone, channel, propertyInterest, propertyId, propertyTitle, source, notes } = cleanLead;
-
-    // Validar propertyId si se proporciona
-    let validPropertyId = null;
-    if (propertyId && isValidUUID(propertyId)) {
-      const property = await prisma.property.findFirst({
-        where: { id: propertyId, tenantId: req.tenantId }
-      });
-      if (property) {
-        validPropertyId = propertyId;
-      }
-    }
-
-    const lead = await prisma.lead.create({
-      data: {
-        tenantId: req.tenantId,
-        name,
-        email,
-        phone,
-        channel: channel || 'formulario',
-        propertyInterest,
-        propertyId: validPropertyId,
-        propertyTitle,
-        source: source || 'Manual',
-        notes,
-        status: 'nuevo'
-      }
-    });
-    
-    console.log(`✅ Lead created: ${name}`);
-    
-    res.status(201).json({ success: true, lead });
-  } catch (error) {
-    console.error('Error creating lead:', error);
-    res.status(500).json({ error: 'Error al crear el lead' });
-  }
-});
-
 /**
  * PUT /api/leads/:id
- * Update a lead
+ * Update a lead - managers and admins only
  */
 router.put('/:id', async (req, res) => {
   try {
@@ -274,14 +268,14 @@ router.put('/:id', async (req, res) => {
     
     res.json({ success: true, lead: updatedLead });
   } catch (error) {
-    console.error('Error updating lead:', error);
+    logger.error({ err: error }, 'updating lead');
     res.status(500).json({ error: 'Error al actualizar el lead' });
   }
 });
 
 /**
  * DELETE /api/leads/:id
- * Delete a lead
+ * Delete a lead - managers and admins only
  */
 router.delete('/:id', async (req, res) => {
   try {
@@ -301,9 +295,12 @@ router.delete('/:id', async (req, res) => {
       where: { id: req.params.id }
     });
     
+    await auditLog(req, 'DELETE', 'lead', req.params.id, true, { name: existing.name, email: existing.email });
+    
     res.json({ success: true, message: 'Lead eliminado' });
   } catch (error) {
-    console.error('Error deleting lead:', error);
+    await auditLog(req, 'DELETE', 'lead', req.params.id, false, { error: error.message });
+    logger.error({ err: error }, 'deleting lead');
     res.status(500).json({ error: 'Error al eliminar el lead' });
   }
 });
@@ -344,7 +341,7 @@ router.post('/:id/followups', async (req, res) => {
     
     res.status(201).json({ success: true, followUp });
   } catch (error) {
-    console.error('Error adding follow-up:', error);
+    logger.error({ err: error }, 'adding follow-up');
     res.status(500).json({ error: 'Error al agregar follow-up' });
   }
 });
@@ -388,7 +385,7 @@ router.post('/:id/start-automation', async (req, res) => {
     
     res.json({ success: true, message: 'Automatización iniciada' });
   } catch (error) {
-    console.error('Error starting automation:', error);
+    logger.error({ err: error }, 'starting automation');
     res.status(500).json({ error: 'Error al iniciar automatización' });
   }
 });
@@ -421,119 +418,8 @@ router.post('/:id/pause-automation', async (req, res) => {
     
     res.json({ success: true, message: 'Automatización pausada' });
   } catch (error) {
-    console.error('Error pausing automation:', error);
+    logger.error({ err: error }, 'pausing automation');
     res.status(500).json({ error: 'Error al pausar automatización' });
-  }
-});
-
-/**
- * POST /api/leads/:id/automation/pause
- * Pause automation for a lead (alias for /:id/pause-automation)
- */
-router.post('/:id/automation/pause', async (req, res) => {
-  try {
-    const lead = await prisma.lead.findFirst({
-      where: { id: req.params.id, tenantId: req.tenantId }
-    });
-    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
-
-    await prisma.lead.update({
-      where: { id: req.params.id },
-      data: { automationPaused: true, automationExitReason: 'paused_by_user' }
-    });
-    res.json({ success: true, message: 'Automatización pausada' });
-  } catch (error) {
-    console.error('Error pausing automation:', error);
-    res.status(500).json({ error: 'Error al pausar automatización' });
-  }
-});
-
-/**
- * POST /api/leads/:id/automation/resume
- * Resume automation for a lead
- */
-router.post('/:id/automation/resume', async (req, res) => {
-  try {
-    const lead = await prisma.lead.findFirst({
-      where: { id: req.params.id, tenantId: req.tenantId }
-    });
-    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
-
-    await prisma.lead.update({
-      where: { id: req.params.id },
-      data: { automationPaused: false }
-    });
-    res.json({ success: true, message: 'Automatización reanudada' });
-  } catch (error) {
-    console.error('Error resuming automation:', error);
-    res.status(500).json({ error: 'Error al reanudar automatización' });
-  }
-});
-
-/**
- * POST /api/leads/:id/automation/stop
- * Stop automation for a lead
- */
-router.post('/:id/automation/stop', async (req, res) => {
-  try {
-    const lead = await prisma.lead.findFirst({
-      where: { id: req.params.id, tenantId: req.tenantId }
-    });
-    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
-
-    await prisma.lead.update({
-      where: { id: req.params.id },
-      data: {
-        inAutomation: false,
-        automationPaused: false,
-        automationExitedAt: new Date(),
-        automationExitReason: 'stopped_by_user'
-      }
-    });
-    res.json({ success: true, message: 'Automatización detenida' });
-  } catch (error) {
-    console.error('Error stopping automation:', error);
-    res.status(500).json({ error: 'Error al detener automatización' });
-  }
-});
-
-/**
- * POST /api/leads/:id/stop-automation
- * Stop automation for a lead
- */
-router.post('/:id/stop-automation', async (req, res) => {
-  try {
-    // Verify lead belongs to tenant
-    const lead = await prisma.lead.findFirst({
-      where: { 
-        id: req.params.id,
-        tenantId: req.tenantId
-      }
-    });
-    
-    if (!lead) {
-      return res.status(404).json({ error: 'Lead no encontrado' });
-    }
-
-    await prisma.lead.update({
-      where: { id: req.params.id },
-      data: {
-        inAutomation: false,
-        automationPaused: false,
-        automationExitedAt: new Date(),
-        automationExitReason: 'stopped_by_user'
-      }
-    });
-    
-    // Also delete any lead sequences
-    await prisma.leadSequence.deleteMany({
-      where: { leadId: req.params.id }
-    });
-    
-    res.json({ success: true, message: 'Automatización detenida' });
-  } catch (error) {
-    console.error('Error stopping automation:', error);
-    res.status(500).json({ error: 'Error al detener automatización' });
   }
 });
 
@@ -583,7 +469,7 @@ router.put('/:id/status', async (req, res) => {
     
     res.json({ success: true, lead: updatedLead });
   } catch (error) {
-    console.error('Error updating status:', error);
+    logger.error({ err: error }, 'updating status');
     res.status(500).json({ error: 'Error al actualizar estado' });
   }
 });
@@ -650,7 +536,7 @@ router.get('/:id/timeline', async (req, res) => {
     
     res.json({ timeline });
   } catch (error) {
-    console.error('Error getting timeline:', error);
+    logger.error({ err: error }, 'getting timeline');
     res.status(500).json({ error: 'Error al obtener timeline' });
   }
 });

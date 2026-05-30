@@ -12,6 +12,7 @@ const {
   extractToken 
 } = require('../services/authService');
 const { logAuthEvent } = require('../middleware/auditLogger');
+const logger = require('../services/logger');
 
 // Cookie options - diferente para dev vs production
 const isProduction = process.env.NODE_ENV === 'production';
@@ -116,7 +117,7 @@ router.post('/login', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Login error:', error);
+    logger.error({ err: error }, 'login error');
     res.status(500).json({ error: 'Error al iniciar sesión' });
   }
 });
@@ -187,7 +188,7 @@ router.post('/refresh', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Refresh error:', error);
+    logger.error({ err: error }, 'refresh error');
     res.status(500).json({ error: 'Error al refrescar token' });
   }
 });
@@ -250,7 +251,7 @@ router.get('/me', requireAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Get user error:', error);
+    logger.error({ err: error }, 'get user error');
     res.status(500).json({ error: 'Error al obtener usuario' });
   }
 });
@@ -317,7 +318,7 @@ router.post('/admin/create-user', requireAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Create user error:', error);
+    logger.error({ err: error }, 'create user error');
     res.status(500).json({ error: 'Error al crear usuario' });
   }
 });
@@ -351,7 +352,7 @@ router.get('/admin/users', requireAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ List users error:', error);
+    logger.error({ err: error }, 'list users error');
     res.status(500).json({ error: 'Error al listar usuarios' });
   }
 });
@@ -400,7 +401,7 @@ router.put('/admin/users/:id', requireAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Update user error:', error);
+    logger.error({ err: error }, 'update user error');
     res.status(500).json({ error: 'Error al actualizar usuario' });
   }
 });
@@ -443,7 +444,7 @@ router.delete('/admin/users/:id', requireAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Delete user error:', error);
+    logger.error({ err: error }, 'delete user error');
     res.status(500).json({ error: 'Error al eliminar usuario' });
   }
 });

@@ -1,55 +1,17 @@
-// Contracts Routes - Generación de contratos inmobiliarios
 const express = require('express');
-const router = express.Router();
-const path = require('path');
-const fs = require('fs');
-const { prisma } = require('../services/db');
-const { requireAuth } = require('./auth');
-const { generateContract } = require('../services/contractService');
+const router  = express.Router();
+const path    = require('path');
+const fs      = require('fs');
+const jwt     = require('jsonwebtoken');
+const { prisma }          = require('../services/db');
+const { requireAuth }     = require('../middleware/auth');
+const { generateContract} = require('../services/contractService');
+const logger = require('../services/logger');
 
-// Apply auth middleware to all routes
-router.use((req, res, next) => {
-  console.log('[CONTRACTS] Headers:', req.headers);
-  next();
-});
-router.use(requireAuth);
+const JWT_SECRET = process.env.JWT_SECRET || 'real-estate-crm-secret-key-2024';
 
-/**
- * POST /api/contracts/generate
- * Genera un contrato (.docx) a partir de una plantilla y datos del formulario
- * 
- * Body:
- * {
- *   leadId: string,
- *   contractType: "compraventa" | "alquiler" | "reserva" | "mandato",
- *   formData: {
- *     // Comprador / Locatario
- *     buyer_dni: string,
- *     buyer_address: string,
- *     buyer_civil_status: string,
- *     
- *     // Vendedor / Locador
- *     seller_name: string,
- *     seller_dni: string,
- *     seller_address: string,
- *     seller_civil_status: string,
- *     
- *     // Propiedad
- *     property_address: string,
- *     property_surface: string,
- *     property_registry: string,
- *     
- *     // Operación
- *     price: number,
- *     currency: string,
- *     closing_date: string,
- *     payment_method: string,
- *     deposit: number,
- *     commission_pct: number
- *   }
- * }
- */
-router.post('/generate', async (req, res) => {
+// ─── POST /api/contracts/generate ────────────────────────────────────────────
+router.post('/generate', requireAuth, async (req, res) => {
   try {
     const { leadId, contractType, formData } = req.body;
 
@@ -57,30 +19,21 @@ router.post('/generate', async (req, res) => {
       return res.status(400).json({ error: 'Faltan datos requeridos: leadId, contractType, formData' });
     }
 
-    // Validar tipo de contrato
     const validTypes = ['compraventa', 'alquiler', 'reserva', 'mandato'];
     if (!validTypes.includes(contractType)) {
-      return res.status(400).json({ 
-        error: `Tipo de contrato inválido. Tipos válidos: ${validTypes.join(', ')}` 
-      });
+      return res.status(400).json({ error: `Tipo inválido. Válidos: ${validTypes.join(', ')}` });
     }
 
-    // Obtener el lead
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
       include: { property: true }
     });
+    if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
 
-    if (!lead) {
-      return res.status(404).json({ error: 'Lead no encontrado' });
-    }
-
-    // Obtener configuración de la agencia
     const agencyConfig = await prisma.agencyConfig.findUnique({
       where: { tenantId: req.tenantId }
     });
 
-    // Generar el contrato
     const { outputPath, filename } = await generateContract({
       contractType,
       lead,
@@ -89,192 +42,155 @@ router.post('/generate', async (req, res) => {
       agencyConfig
     });
 
-    // Guardar en la base de datos
     const document = await prisma.document.create({
       data: {
-        tenantId: req.tenantId,
-        leadId: lead.id,
-        type: 'contract',
-        contractType: contractType,
-        filename: filename,
-        filePath: outputPath,
-        status: 'generated',
+        tenantId:     req.tenantId,
+        leadId:       lead.id,
+        contractType,
+        filename,
+        filePath:     outputPath,
+        status:       'generated',
+        uploadType:   'generated',
         formSnapshot: formData
       }
     });
 
-    console.log(`✅ Contrato generado: ${filename} para lead ${leadId}`);
-
-    // Devolver URL de descarga
-    const downloadUrl = `/api/contracts/download/${document.id}`;
+    logger.info({ filename, leadId }, 'contract generated');
 
     res.json({
       success: true,
       document: {
-        id: document.id,
-        filename: document.filename,
-        downloadUrl: downloadUrl,
-        createdAt: document.createdAt
+        id:          document.id,
+        filename:    document.filename,
+        downloadUrl: `/api/contracts/download/${document.id}`,
+        createdAt:   document.createdAt
       }
     });
 
   } catch (error) {
-    console.error('Error generating contract:', error);
+    logger.error({ err: error }, 'generating contract');
     res.status(500).json({ error: error.message || 'Error al generar el contrato' });
   }
 });
 
-/**
- * GET /api/contracts/download/:id
- * Descarga un contrato generado (.docx)
- * Acepta token desde header o desde query param ?token=...
- */
+// ─── GET /api/contracts/download/:id ─────────────────────────────────────────
+// NO usa requireAuth global — acepta token por header, cookie, O ?token=
 router.get('/download/:id', async (req, res) => {
   try {
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'real-estate-crm-secret-key-2024';
-    
-    // Aceptar token desde header O desde query param ?token=...
+    // 1. Extraer token desde header, cookie, o query param
     let token = null;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       token = authHeader.slice(7);
+    } else if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
     } else if (req.query.token) {
       token = req.query.token;
     }
 
     if (!token) {
-      return res.status(401).json({ error: 'Token requerido' });
+      return res.status(401).json({ error: 'Token requerido', code: 'NO_TOKEN' });
     }
 
-    // Verificar token manualmente
+    // 2. Verificar token
     let decoded;
     try {
       decoded = jwt.verify(token, JWT_SECRET);
     } catch {
-      return res.status(401).json({ error: 'Token inválido' });
+      return res.status(401).json({ error: 'Token inválido o expirado' });
     }
 
-    const { id } = req.params;
-
+    // 3. Buscar documento
     const document = await prisma.document.findFirst({
-      where: {
-        id: id,
-        tenantId: decoded.tenantId
-      }
+      where: { id: req.params.id, tenantId: decoded.tenantId }
     });
 
     if (!document) {
       return res.status(404).json({ error: 'Documento no encontrado' });
     }
 
-    const filePath = document.filePath;
-    
-    if (!fs.existsSync(filePath)) {
+    // 4. Verificar que el archivo existe en disco
+    if (!fs.existsSync(document.filePath)) {
       return res.status(404).json({ error: 'Archivo no encontrado en el servidor' });
     }
 
+    // 5. Enviar el archivo al navegador del usuario
+    res.setHeader('Content-Disposition', `attachment; filename="${document.filename}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Length', fs.statSync(document.filePath).size);
+
+    const stream = fs.createReadStream(document.filePath);
+    stream.on('error', (err) => {
+      logger.error({ err }, 'stream error');
+      if (!res.headersSent) res.status(500).json({ error: 'Error al leer el archivo' });
+    });
+    stream.pipe(res);
+
   } catch (error) {
-    console.error('Error downloading contract:', error);
-    res.status(500).json({ error: 'Error al descargar el contrato' });
+    logger.error({ err: error }, 'downloading contract');
+    if (!res.headersSent) res.status(500).json({ error: 'Error al descargar el contrato' });
   }
 });
 
-/**
- * GET /api/contracts
- * Lista todos los contratos del tenant
- */
-router.get('/', async (req, res) => {
+// ─── GET /api/contracts ───────────────────────────────────────────────────────
+router.get('/', requireAuth, async (req, res) => {
   try {
-    console.log('[CONTRACTS] GET / - tenantId:', req.tenantId, 'query:', req.query)
-    
-    const { leadId, type } = req.query;
+    logger.info({ tenantId: req.tenantId, query: req.query }, 'contracts list request');
 
+    const { leadId, type } = req.query;
     const where = { tenantId: req.tenantId };
     if (leadId) where.leadId = leadId;
-    if (type) where.type = type;
+    if (type)   where.type   = type;
 
-    console.log('[CONTRACTS] where:', where)
+    logger.debug({ where }, 'contracts query');
 
     const documents = await prisma.document.findMany({
       where,
       include: {
-        lead: {
-          select: { id: true, name: true, phone: true, email: true }
-        }
+        lead: { select: { id: true, name: true, phone: true, email: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    console.log('[CONTRACTS] found:', documents.length, 'documents')
+    logger.info({ count: documents.length }, 'contracts found');
     res.json({ documents });
+
   } catch (error) {
-    console.error('[CONTRACTS] Error fetching contracts:', error);
+    logger.error({ err: error }, 'fetching contracts');
     res.status(500).json({ error: 'Error al obtener contratos' });
   }
 });
 
-/**
- * GET /api/contracts/:id
- * Obtiene un contrato específico
- */
-router.get('/:id', async (req, res) => {
+// ─── GET /api/contracts/:id ───────────────────────────────────────────────────
+router.get('/:id', requireAuth, async (req, res) => {
   try {
-    const { id } = req.params;
-
     const document = await prisma.document.findFirst({
-      where: {
-        id: id,
-        tenantId: req.tenantId
-      },
-      include: {
-        lead: true
-      }
+      where: { id: req.params.id, tenantId: req.tenantId },
+      include: { lead: true }
     });
-
-    if (!document) {
-      return res.status(404).json({ error: 'Documento no encontrado' });
-    }
-
+    if (!document) return res.status(404).json({ error: 'Documento no encontrado' });
     res.json({ document });
   } catch (error) {
-    console.error('Error fetching contract:', error);
+    logger.error({ err: error }, 'fetching contract');
     res.status(500).json({ error: 'Error al obtener el contrato' });
   }
 });
 
-/**
- * DELETE /api/contracts/:id
- * Elimina un contrato
- */
-router.delete('/:id', async (req, res) => {
+// ─── DELETE /api/contracts/:id ────────────────────────────────────────────────
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const { id } = req.params;
-
     const document = await prisma.document.findFirst({
-      where: {
-        id: id,
-        tenantId: req.tenantId
-      }
+      where: { id: req.params.id, tenantId: req.tenantId }
     });
+    if (!document) return res.status(404).json({ error: 'Documento no encontrado' });
 
-    if (!document) {
-      return res.status(404).json({ error: 'Documento no encontrado' });
-    }
+    if (fs.existsSync(document.filePath)) fs.unlinkSync(document.filePath);
 
-    // Eliminar archivo físico si existe
-    if (fs.existsSync(document.filePath)) {
-      fs.unlinkSync(document.filePath);
-    }
-
-    // Eliminar de la base de datos
-    await prisma.document.delete({
-      where: { id: document.id }
-    });
+    await prisma.document.delete({ where: { id: document.id } });
 
     res.json({ success: true, message: 'Contrato eliminado' });
   } catch (error) {
-    console.error('Error deleting contract:', error);
+    logger.error({ err: error }, 'deleting contract');
     res.status(500).json({ error: 'Error al eliminar el contrato' });
   }
 });
