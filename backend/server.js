@@ -8,6 +8,9 @@ const { v4: uuidv4 } = require('uuid');
 // Load .env from current directory (backend folder)
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// Logger estructurado
+const logger = require('./services/logger');
+
 // Initialize Prisma (multi-tenant con Supabase)
 const { prisma } = require('./services/db');
 
@@ -80,6 +83,18 @@ app.use(cors({
 // Middleware - Parse cookies for auth
 app.use(cookieParser());
 
+// Request ID — para correlacionar logs
+app.use((req, res, next) => {
+  req.id = req.id || uuidv4()
+  next()
+})
+
+// Logging estructurado (pino-http) — solo en producción
+if (process.env.NODE_ENV === 'production') {
+  const pinoHttp = require('pino-http')({ logger })
+  app.use(pinoHttp)
+}
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -128,15 +143,21 @@ app.use('/api/assignment', generalRateLimit(100, 60000), requireAuth, require('.
 app.use('/api/documents', generalRateLimit(100, 60000), requireAuth, documentRoutes);
 app.use('/api/folders', generalRateLimit(100, 60000), requireAuth, folderRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Rates — público, sin requireAuth, rate limiting ligero
+app.use('/api/rates', generalRateLimit(30, 60000), require('./routes/rates'));
+
+// Health check mejorado — verifica DB, Cloudinary y uptime
+const { getHealth } = require('./services/health');
+
+app.get('/api/health', async (req, res) => {
+  const health = await getHealth()
+  const statusCode = health.status === 'ok' ? 200 : 503
+  res.status(statusCode).json(health)
 });
 
 // Prueba de webhook público - para verificar que ngrok funciona
 app.get('/api/test-webhook', (req, res) => {
-  console.log('📥 Test webhook llamado');
-  console.log('  Query:', req.query);
+  logger.info({ query: req.query }, 'test webhook called');
   res.json({ received: true, query: req.query });
 });
 
@@ -147,7 +168,7 @@ app.get('/api/debug/facebook', (req, res) => {
     FACEBOOK_VERIFY_TOKEN: process.env.FACEBOOK_VERIFY_TOKEN || 'NOT SET',
     FACEBOOK_PAGE_ID: process.env.FACEBOOK_PAGE_ID || 'NOT SET'
   };
-  console.log('📊 Debug Facebook env:', vars);
+  logger.info({ facebookVars: vars }, 'facebook env debug');
   res.json(vars);
 });
 
@@ -211,13 +232,19 @@ app.get('/api/instagram/test', async (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+// Export app para tests (supertest no necesita listen)
+module.exports = { app }
+
+// No llamar a listen cuando lo importa vitest
+if (!process.env.VITEST) {
 app.listen(PORT, () => {
-  console.log(`🚀 Backend running on http://localhost:${PORT}`);
+  logger.info({ port: PORT }, `Backend running on http://localhost:${PORT}`);
 
   // Iniciar servicios después de que el servidor esté corriendo
   setTimeout(() => {
     startAutomationService(prisma);
     startScheduler();
-    console.log('📅 Scheduler service started - checking for due posts every 30s');
+    logger.info('Scheduler service started - checking for due posts every 30s');
   }, 3000);
 });
+}
