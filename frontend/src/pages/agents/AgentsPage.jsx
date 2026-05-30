@@ -658,6 +658,16 @@ const AgentsPage = ({ onNavigate }) => {
                         </div>
                       </div>
                       <Sparkline data={ag.weeklyTrend || [3,5,4,6,5,7,6]} color={ag.color} />
+                      {ag.isReal && (
+                        <button
+                          onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true); }}
+                          className="px-3 py-2 bg-red-500/15 border border-red-500/30 rounded-lg text-red-400 text-sm font-medium hover:bg-red-500/25 transition-colors flex items-center gap-2 shrink-0"
+                          title="Eliminar agente"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Eliminar
+                        </button>
+                      )}
                     </div>
 
                     {/* Tabs */}
