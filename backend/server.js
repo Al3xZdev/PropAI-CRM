@@ -13,7 +13,7 @@ const { prisma } = require('./services/db');
 
 // Initialize Resend email service
 const { initializeResend } = require('./services/emailService');
-const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_5TpNcdfJ_4emo6iSq8E4NcF9PobjBbhoX';
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 initializeResend(RESEND_API_KEY);
 
 // Initialize automation service (cron job for sequences)

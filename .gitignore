@@ -35,3 +35,6 @@ coverage/
 
 # Misc
 .vercel
+
+# Credentials reference (contains real secrets - keep local only)
+credenciales.txt

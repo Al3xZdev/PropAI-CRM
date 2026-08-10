@@ -6,12 +6,18 @@ const streamifier = require('streamifier');
 require('dotenv').config();
 
 // Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dokudud05',
-  api_key: process.env.CLOUDINARY_API_KEY || '163778436428583',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'm0EeQDVVIbloh7iXcxdVlnI8dwY',
+const cloudinaryConfig = {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true
-});
+};
+
+if (!cloudinaryConfig.cloud_name || !cloudinaryConfig.api_key || !cloudinaryConfig.api_secret) {
+  console.warn('⚠️ Cloudinary not configured: missing CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET in .env');
+} else {
+  cloudinary.config(cloudinaryConfig);
+}
 
 console.log('☁️ Cloudinary configured:', process.env.CLOUDINARY_CLOUD_NAME);
 

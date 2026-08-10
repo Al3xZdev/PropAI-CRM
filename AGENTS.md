@@ -56,4 +56,3 @@ cd frontend && npm run build
 - **Cloudinary**: Image/file storage (configured in backend/.env)
 - **Supabase**: Database hosting + file storage bucket
 - **Resend**: Email sending
-- **n8n**: Workflow automation (workflows in root .json files)
