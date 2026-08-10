@@ -36,17 +36,17 @@ export default function PropertyImportCSV({ isOpen, onClose, onImportComplete })
     try {
       const response = await api.get('/properties/import-template')
       
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'plantilla_propiedades.csv'
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        a.remove()
-      }
+      if (!response.ok) throw new Error('Template route unavailable')
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'plantilla_propiedades.csv'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      a.remove()
     } catch (err) {
       // Crear plantilla local si el servidor no responde
       const template = EXPECTED_FIELDS.map(f => f.key).join(',') + '\n' +
