@@ -740,7 +740,7 @@ case 'properties':
                       Descripción para Portal
                     </h3>
                     <div className="flex gap-2">
-                      <button onClick={() => copyToClipboard(content.portalDescriptions?.[0]?.content?.description || content.portalDescriptions?.[0]?.content?.body || '')} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm flex items-center gap-2">
+                      <button onClick={() => copyToClipboard(content.portalDescription?.[0]?.content?.description || content.portalDescription?.[0]?.content?.body || '')} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm flex items-center gap-2">
                         <Copy className="w-4 h-4" />
                         Copiar
                       </button>
@@ -748,7 +748,7 @@ case 'properties':
                   </div>
                   <div className="bg-slate-700/50 p-4 rounded-xl min-h-32">
                     <p className="text-slate-300 whitespace-pre-wrap leading-relaxed">
-                      {content.portalDescriptions?.[0]?.content?.description || content.portalDescriptions?.[0]?.content?.body || 'Cargando descripción...'}
+                      {content.portalDescription?.[0]?.content?.description || content.portalDescription?.[0]?.content?.body || 'Cargando descripción...'}
                     </p>
                   </div>
                 </div>

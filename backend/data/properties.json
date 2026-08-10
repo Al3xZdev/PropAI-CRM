@@ -1,46 +1,4 @@
 {
-  "d47f2e3c-a910-4e62-a9c4-68759704af26": {
-    "id": "d47f2e3c-a910-4e62-a9c4-68759704af26",
-    "title": "Casa en Venta - 4 Dorm. - Quincho - Amplio Jardín - San Jorge Village",
-    "address": "Los Polvorines, Los Polvorines, Malvinas Argentinas",
-    "price": 720000,
-    "area": 640,
-    "bedrooms": 6,
-    "bathrooms": 4,
-    "description": "Lindisima casa de estilo construida sobre amplio terreno interno arbolado .\r\nPB , hall de recepción , gran living con chimenea y grandes ventanales con medio punto que comunican con el exterior , comedor separado con conexión a\r\nhacia la cocina , la cocina posee barra desayunadora , con profusión de alacenas altas y bajas y placares de guardado, horno y anafafe empotrada y\r\nespacio para lavavajillas tambien posee espacio para comedor diario .Sala de estar donde se armó una sala de TV .Dormitorio en suite amplio o escritorio\r\n\r\nPA .tres dormitorios que comparten un baño completo y placares todos de madera .Master suite con vestidor y ante baño y sauna .Hall\r\nde distribución amplio donde se puede armar un multiespacio .Galeria .\r\nExterior :quincho con parrilla y portón automático y puerta ventana hacia el jardín , vestuario con baño , cuarto de servicio y lavandería totalmente\r\nindependiente.\r\nPileta climatizada revestida con venecitas y bordes atermicos.\r\nCalefacción por loza radiante .Equipo de aire acondicionado central en PB y equipo de split individuales en los dormitorios .\r\nAberturas de madera Alemanas y mosquiteros .",
-    "propertyType": "casa",
-    "features": [
-      "Jardín",
-      "Alberca",
-      "Estacionamiento",
-      "Acepta Mascotas",
-      "Amueblado"
-    ],
-    "yearBuilt": null,
-    "floors": 1,
-    "images": [
-      {
-        "id": "707b432a-2499-4c84-8bcf-4f77f96bd059",
-        "filename": "235369fb-21c8-441d-bf8c-413fc17c1625-2038583230.jpg",
-        "url": "/uploads/235369fb-21c8-441d-bf8c-413fc17c1625-2038583230.jpg",
-        "originalName": "2038583230.jpg"
-      },
-      {
-        "id": "385964fe-5fcc-486f-8787-7000294c2ed6",
-        "filename": "359c532e-57c3-412f-b163-ba77cc865458-2038583213.jpg",
-        "url": "/uploads/359c532e-57c3-412f-b163-ba77cc865458-2038583213.jpg",
-        "originalName": "2038583213.jpg"
-      },
-      {
-        "id": "d3fc5b69-c585-41bb-b7e0-3519eaf62b6e",
-        "filename": "f0caac1e-bdb4-40bf-b544-cb51ac23fc25-2038583349.jpg",
-        "url": "/uploads/f0caac1e-bdb4-40bf-b544-cb51ac23fc25-2038583349.jpg",
-        "originalName": "2038583349.jpg"
-      }
-    ],
-    "createdAt": "2026-04-04T19:50:21.063Z",
-    "status": "draft"
-  },
   "7affce20-2b5e-4bab-9b6f-25d6d9e75fce": {
     "id": "7affce20-2b5e-4bab-9b6f-25d6d9e75fce",
     "title": " Casa en Alquiler en Barrio Las Liebres 3 Dorm + Vestidor + Escritorio/play + Pileta + Parrilla",
