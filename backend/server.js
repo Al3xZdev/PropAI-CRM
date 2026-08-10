@@ -19,9 +19,6 @@ initializeResend(RESEND_API_KEY);
 // Initialize automation service (cron job for sequences)
 const { startAutomationService } = require('./services/automationService');
 
-// Initialize scheduler service (cron job for scheduled posts)
-const { startScheduler } = require('./services/scheduler');
-
 // Middleware
 const { authRateLimit, generalRateLimit } = require('./middleware/rateLimiter');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -217,7 +214,6 @@ app.listen(PORT, () => {
   // Iniciar servicios después de que el servidor esté corriendo
   setTimeout(() => {
     startAutomationService(prisma);
-    startScheduler();
-    console.log('📅 Scheduler service started - checking for due posts every 30s');
+    console.log('📅 Scheduled posts are published manually via /api/schedule/:scheduleId/publish/:postIndex');
   }, 3000);
 });
