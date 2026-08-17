@@ -6,101 +6,18 @@ import {
   CheckCircle2, AlertCircle, Loader2, X,
   Phone, Mail, Home, Calendar, DollarSign, Target,
   ChevronRight, Sparkles, Bell, BarChart3, MapPin, Globe,
-  Check, Trash2, AlertTriangle
+  Check, Trash2, AlertTriangle, Flame, Zap
 } from 'lucide-react'
 
 import { api } from '../../utils/api'
+import CommissionsView from './CommissionsView'
+import PhoneInput from '../../components/PhoneInput'
+import { isValidPhoneNumber } from 'libphonenumber-js'
 
 // Color palette for agents
 const AGENT_COLORS = ['#818cf8', '#34d399', '#fb923c', '#f472b6', '#60a5fa', '#a78bfa', '#fbbf24', '#22d3ee']
 
 const getRandomColor = (index) => AGENT_COLORS[index % AGENT_COLORS.length]
-
-// Example agents (demo data)
-const EXAMPLE_AGENTS = [
-  {
-    id: 'demo-1', 
-    name: "Valentina Ríos", 
-    color: "#818cf8", 
-    status: "online",
-    stats: { totalLeads: 12, closed: 34, pending: 5, lost: 3, weekLeads: 8, monthLeads: 22, byStatus: { nuevo: 4, contactado: 3, respondio: 12, cerrado: 34 } },
-    conversionRate: 74, 
-    avgCloseDays: 6.2, 
-    revenue: 184000,
-    weeklyTrend: [8, 11, 9, 14, 12, 16, 12],
-    phone: "+5491165432100",
-    email: "valentina@demo.com",
-    vacations: [],
-    pipeline: { nuevo: 4, contactado: 3, propuesta: 3, negociacion: 2, cerrado: 34 },
-    notes: ["Cliente VIP - llamar antes del jueves", "Interesado en plan enterprise"],
-  },
-  {
-    id: 'demo-2', 
-    name: "Mateo Herrera", 
-    color: "#34d399", 
-    status: "online",
-    stats: { totalLeads: 8, closed: 21, pending: 9, lost: 7, weekLeads: 5, monthLeads: 15, byStatus: { nuevo: 2, contactado: 3, respondio: 8, cerrado: 21 } },
-    conversionRate: 52, 
-    avgCloseDays: 9.8, 
-    revenue: 97500,
-    weeklyTrend: [5, 6, 4, 8, 7, 5, 8],
-    phone: "+5491145678901",
-    email: "mateo@demo.com",
-    vacations: [{ from: "2026-05-01", to: "2026-05-07", label: "Vacaciones mayo" }],
-    pipeline: { nuevo: 2, contactado: 3, propuesta: 2, negociacion: 1, cerrado: 21 },
-    notes: ["Requiere demo personalizada"],
-  },
-  {
-    id: 'demo-3', 
-    name: "Lucía Fernández", 
-    color: "#fb923c", 
-    status: "away",
-    stats: { totalLeads: 15, closed: 47, pending: 2, lost: 4, weekLeads: 12, monthLeads: 32, byStatus: { nuevo: 5, contactado: 4, respondio: 15, cerrado: 47 } },
-    conversionRate: 81, 
-    avgCloseDays: 4.9, 
-    revenue: 263000,
-    weeklyTrend: [12, 14, 13, 17, 15, 18, 15],
-    phone: "+5491134567890",
-    email: "lucia@demo.com",
-    vacations: [],
-    pipeline: { nuevo: 5, contactado: 4, propuesta: 4, negociacion: 2, cerrado: 47 },
-    notes: [],
-  },
-  {
-    id: 'demo-4', 
-    name: "Diego Castillo", 
-    color: "#f472b6", 
-    status: "offline",
-    stats: { totalLeads: 3, closed: 11, pending: 7, lost: 9, weekLeads: 3, monthLeads: 8, byStatus: { nuevo: 1, contactado: 1, respondio: 3, cerrado: 11 } },
-    conversionRate: 38, 
-    avgCloseDays: 14.1, 
-    revenue: 41000,
-    weeklyTrend: [4, 2, 3, 1, 3, 2, 3],
-    phone: "+5491176543210",
-    email: "diego@demo.com",
-    vacations: [{ from: "2026-04-22", to: "2026-04-25", label: "Día personal" }],
-    pipeline: { nuevo: 1, contactado: 1, propuesta: 1, negociacion: 0, cerrado: 11 },
-    notes: ["Esperando aprobación interna del cliente"],
-  },
-];
-
-// Example leads for demo agents
-const EXAMPLE_LEADS = [
-  { id: 1, name: "Carlos Méndez", priority: "alta", stage: "negociacion", lastActivity: 8, slaHours: 52, value: 12000, dueDate: "2026-04-23", notes: ["Cliente VIP, llamar antes del jueves"] },
-  { id: 2, name: "Sofia Vargas", priority: "media", stage: "propuesta", lastActivity: 2, slaHours: 18, value: 4500, dueDate: "2026-04-28", notes: [] },
-  { id: 3, name: "Roberto Luna", priority: "alta", stage: "contactado", lastActivity: 12, slaHours: 71, value: 8200, dueDate: "2026-04-22", notes: ["Requiere demo personalizada"] },
-  { id: 4, name: "Ana Torres", priority: "baja", stage: "nuevo", lastActivity: 18, slaHours: 90, value: 1800, dueDate: "2026-05-10", notes: [] },
-  { id: 5, name: "Javier Ríos", priority: "alta", stage: "negociacion", lastActivity: 1, slaHours: 6, value: 22000, dueDate: "2026-04-24", notes: ["Negociando descuento 15%"] },
-  { id: 6, name: "Camila Ortiz", priority: "media", stage: "nuevo", lastActivity: 21, slaHours: 110, value: 3300, dueDate: "2026-05-05", notes: [] },
-  { id: 7, name: "Hernán Blanco", priority: "alta", stage: "propuesta", lastActivity: 15, slaHours: 88, value: 9100, dueDate: "2026-04-22", notes: ["Esperando aprobación interna"] },
-];
-
-const getExampleLeads = (agentId) => {
-  return EXAMPLE_LEADS.filter(l => {
-    const agentNum = parseInt(agentId.split('-')[1]) || 1
-    return l.id >= (agentNum * 2 - 1) && l.id <= agentNum * 2
-  })
-}
 
 // Simple Sparkline component
 function Sparkline({ data, color = '#818cf8' }) {
@@ -174,7 +91,202 @@ const priorityConfig = {
   baja: { color: '#64748b', bg: 'rgba(100,116,139,0.12)', border: 'rgba(100,116,139,0.3)', label: 'Baja' },
 };
 
-const AgentsPage = ({ onNavigate }) => {
+const DAY_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+
+// ── Nuevo look: componentes presentacionales ──────────────────────────────
+function AgentAvatar({ initial, size = 'md' }) {
+  const sizes = { sm: 'w-9 h-9 text-sm', md: 'w-12 h-12 text-lg' }
+  return (
+    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shrink-0`}>
+      {initial}
+    </div>
+  )
+}
+
+function AgentListItem({ agent, selected, onSelect }) {
+  const pct = Math.min(100, agent.loadPercent || 0)
+  const barColor = pct > 90 ? 'bg-rose-500' : pct > 70 ? 'bg-amber-400' : 'bg-emerald-500'
+  return (
+    <button
+      onClick={() => onSelect(agent)}
+      className={`w-full text-left rounded-xl p-3 transition-colors flex items-start gap-3 ${selected ? 'bg-slate-800/90 ring-1 ring-blue-500/40' : 'bg-slate-900/60 hover:bg-slate-800/50'}`}
+    >
+      <AgentAvatar initial={agent.initial} size="sm" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1">
+          <p className="text-sm font-semibold text-white truncate">{agent.name}</p>
+          {agent.top && <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400 shrink-0" />}
+        </div>
+        <p className="text-xs text-slate-400 mt-0.5">{agent.activeLeads} leads activos</p>
+        <div className="h-1.5 rounded-full bg-slate-800 mt-2 overflow-hidden">
+          <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function KpiCard({ label, value, valueClassName }) {
+  return (
+    <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className={`text-2xl font-bold mt-1 ${valueClassName || 'text-white'}`}>{value}</p>
+    </div>
+  )
+}
+
+function WeeklyTrendChart({ data, thisWeek }) {
+  const max = Math.max(...data, 1)
+  return (
+    <div className="bg-slate-900 rounded-xl p-5 border border-slate-800">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-sm font-semibold text-white">Tendencia semanal</p>
+          <p className="text-xs text-slate-400 mt-0.5">Leads recibidos en los últimos 7 días</p>
+        </div>
+        <span className="text-xs text-blue-400 font-medium bg-blue-500/10 px-2.5 py-1 rounded-full">
+          {thisWeek} esta semana
+        </span>
+      </div>
+      <div className="flex items-end gap-1.5 h-28">
+        {data.map((value, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+            <div className="w-full rounded-t-md transition-all duration-500" style={{ height: `${(value / max) * 100}%`, backgroundColor: i === data.length - 1 ? '#3b82f6' : '#1e3a5f' }} />
+            <span className="text-[10px] text-slate-500">{DAY_LABELS[i]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function UnassignedLeadsBanner({ count, onManual, onRoundRobin }) {
+  if (count === 0) return null
+  return (
+    <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
+      <div className="flex items-center gap-3">
+        <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+        <p className="text-sm text-amber-200">
+          Hay <span className="font-semibold">{count}</span> leads sin asignar
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={onManual} className="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg transition-colors">
+          Asignación manual
+        </button>
+        <button onClick={onRoundRobin} className="text-xs bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-3 py-1.5 rounded-lg transition-colors">
+          Round-robin
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Nuevo look: Analytics ────────────────────────────────────────────────
+function conversionColor(pct) {
+  if (pct >= 70) return '#4ade80' // verde
+  if (pct >= 50) return '#facc15' // amarillo
+  return '#f87171' // rojo
+}
+function closingColor(days) {
+  if (days <= 6) return '#4ade80'
+  if (days <= 10) return '#facc15'
+  return '#f87171'
+}
+
+function SummaryCard({ icon: Icon, label, value, hint }) {
+  return (
+    <div className="bg-slate-900 rounded-lg p-3.5">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Icon size={15} className="text-slate-400" />
+        <span className="text-[11px] text-slate-400">{label}</span>
+      </div>
+      <div className="text-[22px] font-medium text-white">{value}</div>
+      <div className="text-[11px] text-slate-500 mt-0.5">{hint}</div>
+    </div>
+  )
+}
+
+function BarRow({ label, valueLabel, percent, color }) {
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-slate-200">{label}</span>
+        <span style={{ color }} className="font-medium">
+          {valueLabel}
+        </span>
+      </div>
+      <div className="h-[5px] bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${percent}%`, background: color }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ClosingTimeRow({ label, days, percent, color }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="w-16 text-xs text-slate-200 shrink-0">{label}</span>
+      <div className="flex-1 h-[5px] bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${percent}%`, background: color }}
+        />
+      </div>
+      <span
+        style={{ color }}
+        className="w-10 text-right text-xs font-medium shrink-0"
+      >
+        {days}d
+      </span>
+    </div>
+  )
+}
+
+function RankingRow({ position, agent, isTop }) {
+  return (
+    <div
+      className={`flex items-center gap-2.5 py-2 ${
+        !isTop ? 'border-t border-slate-800' : ''
+      }`}
+    >
+      <span
+        className={`w-4 text-xs ${
+          position === 1 ? 'text-amber-400' : 'text-slate-500'
+        }`}
+      >
+        {position}
+      </span>
+      <div className="w-7 h-7 rounded-full bg-slate-800 text-indigo-200 flex items-center justify-center text-xs font-medium shrink-0">
+        {agent.initial}
+      </div>
+      <span
+        className={`flex-1 text-[13px] ${
+          isTop ? 'text-white font-medium' : 'text-slate-200'
+        }`}
+      >
+        {agent.name}
+      </span>
+      <span
+        style={{ color: conversionColor(agent.conversion) }}
+        className="text-xs w-10 text-right"
+      >
+        {agent.conversion}%
+      </span>
+      <span className="text-xs text-slate-400 w-20 text-right">
+        {agent.closingDays}d cierre
+      </span>
+      <span className="text-xs text-white font-medium w-20 text-right">
+        ${agent.revenue.toLocaleString('es-MX')}
+      </span>
+    </div>
+  )
+}
+
+const AgentsPage = ({ onNavigate, user }) => {
   // Theme colors - always dark mode
   const colors = {
     background: '#17181c',
@@ -229,25 +341,28 @@ const AgentsPage = ({ onNavigate }) => {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [workloadRes, unassignedRes] = await Promise.all([
+      const [workloadRes, unassignedRes, statsRes] = await Promise.all([
         api.get('/assignment/workload').catch(() => ({ ok: true, json: () => ({ workload: [] }) })),
-        api.get('/assignment/unassigned').catch(() => ({ ok: true, json: () => ({ leads: [] }) }))
+        api.get('/assignment/unassigned').catch(() => ({ ok: true, json: () => ({ leads: [] }) })),
+        api.get('/stats/agents').catch(() => ({ ok: true, json: async () => ({ agents: [] }) }))
       ])
       
       const workloadData = await workloadRes.json()
       const unassignedData = await unassignedRes.json()
+      const statsData = await statsRes.json()
+      const realStats = {}
+      for (const s of (statsData.agents || [])) realStats[s.id] = s
       
       // Convert real agents with colors
       const realWithColor = (workloadData.workload || []).map((agent, idx) => ({
         ...agent,
-        isReal: true,
-        color: getRandomColor(idx + EXAMPLE_AGENTS.length),
-        weeklyTrend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 10) + 2),
-        revenue: Math.floor(Math.random() * 200000) + 50000,
-        conversionRate: Math.floor(Math.random() * 40) + 40,
-        avgCloseDays: (Math.random() * 10 + 3).toFixed(1),
-        pipeline: { nuevo: 1, contactado: 2, propuesta: 1, negociacion: 1, cerrado: 3 },
-        phone: '+549110000000' + idx,
+        color: getRandomColor(idx),
+        weeklyTrend: realStats[agent.id]?.weeklyTrend || Array.from({ length: 7 }, () => 0),
+        revenue: realStats[agent.id]?.revenue || 0,
+        conversionRate: realStats[agent.id]?.conversionRate || 0,
+        avgCloseDays: realStats[agent.id]?.avgCloseDays || 0,
+        pipeline: realStats[agent.id]?.pipeline || {},
+        phone: realStats[agent.id]?.phone || '',
         email: agent.email,
         vacations: [],
         notes: []
@@ -256,16 +371,16 @@ const AgentsPage = ({ onNavigate }) => {
       setRealAgents(realWithColor)
       setUnassignedLeads(unassignedData.leads || [])
       
-      // Combine example + real agents
-      const allAgents = [...EXAMPLE_AGENTS, ...realWithColor]
+      // Combine real agents
+      const allAgents = realWithColor
       
-      // Select first example agent by default
+      // Select first real agent by default
       if (allAgents.length > 0 && !selectedAgent) {
-        setSelectedAgent(EXAMPLE_AGENTS[0])
+        setSelectedAgent(realWithColor[0])
       }
     } catch (err) {
       console.error('Error loading data:', err)
-      setSelectedAgent(EXAMPLE_AGENTS[0])
+      setSelectedAgent(realAgents[0])
     } finally {
       setLoading(false)
     }
@@ -283,19 +398,14 @@ const AgentsPage = ({ onNavigate }) => {
       setNotes([])
     }
     
-    // Load leads for real agents
-    if (agent.isReal) {
-      try {
-        const res = await api.get(`/assignment/agents/${agent.id}/leads`)
-        const data = await res.json()
-        setAgentLeads(data.leads || [])
-      } catch (err) {
-        console.error('Error loading agent leads:', err)
-        setAgentLeads([])
-      }
-    } else {
-      // For example agents, use example leads
-      setAgentLeads(getExampleLeads(agent.id))
+    // Load leads for the agent
+    try {
+      const res = await api.get(`/assignment/agents/${agent.id}/leads`)
+      const data = await res.json()
+      setAgentLeads(data.leads || [])
+    } catch (err) {
+      console.error('Error loading agent leads:', err)
+      setAgentLeads([])
     }
 
     // Load commissions for this agent
@@ -450,6 +560,12 @@ const AgentsPage = ({ onNavigate }) => {
 
   const handleCreateUser = async (e) => {
     e.preventDefault()
+
+    if (newUser.phone && !isValidPhoneNumber(newUser.phone)) {
+      toast.error('El número de teléfono es inválido para el país seleccionado')
+      return
+    }
+
     setCreating(true)
     
     try {
@@ -474,7 +590,7 @@ const AgentsPage = ({ onNavigate }) => {
   }
 
   // Combine agents for display
-  const allAgents = [...EXAMPLE_AGENTS, ...realAgents]
+  const allAgents = realAgents
   const totalRevenue = allAgents.reduce((s, a) => s + (a.revenue || 0), 0)
   const avgConversion = allAgents.length > 0 
     ? Math.round(allAgents.reduce((s, a) => s + (a.conversionRate || 0), 0) / allAgents.length)
@@ -482,6 +598,7 @@ const AgentsPage = ({ onNavigate }) => {
   const totalActiveLeads = allAgents.reduce((s, a) => s + (a.stats?.totalLeads || 0), 0)
   const totalClosedLeads = allAgents.reduce((s, a) => s + (a.stats?.closed || a.stats?.byStatus?.respondio || a.stats?.byStatus?.cerrado || 0), 0)
   const maxWorkload = Math.max(...allAgents.map(a => (a.stats?.totalLeads || 0) + (a.stats?.pendingFollowUps || 0)), 1)
+  const maxCloseDays = Math.max(...allAgents.map(a => a.avgCloseDays || 0), 1)
 
   if (loading) {
     return (
@@ -494,7 +611,8 @@ const AgentsPage = ({ onNavigate }) => {
   const NAV = [
     { key: 'agents', label: 'Agentes', icon: Users },
     { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { key: 'alerts', label: 'Alertas', icon: Bell, badge: unassignedLeads.length }
+    { key: 'alerts', label: 'Alertas', icon: Bell, badge: unassignedLeads.length },
+    { key: 'commissions', label: 'Comisiones', icon: DollarSign }
   ]
 
   return (
@@ -506,6 +624,7 @@ const AgentsPage = ({ onNavigate }) => {
             {globalView === 'agents' && 'Gestión de Agentes'}
             {globalView === 'analytics' && 'Analytics & Performance'}
             {globalView === 'alerts' && 'Alertas & Monitoreo'}
+            {globalView === 'commissions' && 'Comisiones'}
           </h1>
           <p className="text-slate-400 mt-1">
             {allAgents.length} agentes • {totalActiveLeads} leads activos
@@ -549,101 +668,41 @@ const AgentsPage = ({ onNavigate }) => {
       </div>
 
       {/* Unassigned Alert */}
-      {unassignedLeads.length > 0 && (
-            <div className="bg-gradient-to-r from-amber-500/10 to-red-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between gap-4 mb-6 flex-wrap">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center text-lg">
-                  ⚠️
-                </div>
-                <div>
-                  <p className="text-amber-400 font-semibold">{unassignedLeads.length} leads sin asignar</p>
-                  <p className="text-amber-400/70 text-sm">Requieren asignación inmediata</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => openLeadAssignModal()}
-                  className="px-3 py-2 bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-sm font-medium hover:bg-amber-500/30 transition-colors"
-                >
-                  Manual
-                </button>
-                <button 
-                  onClick={handleAutoAssign}
-                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg style={{ color: #ffffff }} text-sm font-bold flex items-center gap-2"
-                >
-                  🔄 Round-Robin
-                </button>
-              </div>
-            </div>
-          )}
+      <UnassignedLeadsBanner
+        count={unassignedLeads.length}
+        onManual={() => openLeadAssignModal()}
+        onRoundRobin={handleAutoAssign}
+      />
 
           {/* VIEW: AGENTS */}
           {globalView === 'agents' && (
-            <div className="grid grid-cols-[280px_1fr] gap-5">
+            <div className="grid grid-cols-[220px_1fr] gap-3.5">
               {/* Agent List */}
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider mb-3 pl-1" style={{ color: colors.muted }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-3 pl-1 text-slate-500">
                   Agentes ({allAgents.length})
                 </p>
                 <div className="flex flex-col gap-2">
-                  {allAgents.map((agent, idx) => {
+                  {allAgents.map((agent) => {
                     const workloadCount = (agent.stats?.totalLeads || 0) + (agent.stats?.pendingFollowUps || 0)
                     const pct = maxWorkload > 0 ? (workloadCount / maxWorkload) * 100 : 0
                     const isSelected = selectedAgent?.id === agent.id
                     const isOverloaded = (agent.stats?.totalLeads || 0) >= 14
-                    
+
                     return (
-                      <div
+                      <AgentListItem
                         key={agent.id}
-                        onClick={() => handleSelectAgent(agent)}
-                        className={`p-4 rounded-xl cursor-pointer transition-all backdrop-blur-sm ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-[colors.primary]/20 to-[colors.primary]/10 border-2 border-[colors.primary]/50'
-                            : 'bg-[colors.card] border border-white/5 hover:bg-[#0f1d2e]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 mb-3">
-                          <div 
-                            className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold border-2"
-                            style={{ 
-                              backgroundColor: `${agent.color}22`, 
-                              borderColor: `${agent.color}55`, 
-                              color: agent.color 
-                            }}
-                          >
-                            {agent.name?.charAt(0).toUpperCase() || '?'}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-sm truncate" style={{ color: colors.foreground }}>
-                                {agent.name}
-                              </p>
-                              {isOverloaded && <span className="text-xs">🔥</span>}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-lg" style={{ color: isSelected ? '#818cf8' : colors.muted }}>
-                              {agent.stats?.totalLeads || 0}
-                            </p>
-                            <p className="text-xs" style={{ color: colors.muted }}>activos</p>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span style={{ color: colors.muted }}>Carga</span>
-                            <span style={{ color: colors.muted }}>{workloadCount} leads</span>
-                          </div>
-                          <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                            <div 
-                              className="h-full rounded-full transition-all duration-300"
-                              style={{ 
-                                width: `${pct}%`,
-                                backgroundColor: pct > 80 ? '#ef4444' : pct > 55 ? '#f59e0b' : agent.color
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                        agent={{
+                          id: agent.id,
+                          name: agent.name,
+                          initial: agent.name?.charAt(0).toUpperCase() || '?',
+                          activeLeads: agent.stats?.totalLeads || 0,
+                          loadPercent: pct,
+                          top: isOverloaded,
+                        }}
+                        selected={isSelected}
+                        onSelect={handleSelectAgent}
+                      />
                     )
                   })}
                 </div>
@@ -652,42 +711,31 @@ const AgentsPage = ({ onNavigate }) => {
               {/* Agent Detail */}
               {selectedAgent && (() => {
                 const ag = selectedAgent
-                const agLeads = ag.isReal ? agentLeads : getExampleLeads(ag.id)
+                const agLeads = agentLeads
                 const tabs = [
                   { key: 'overview', label: 'Resumen' },
                   { key: 'info', label: 'Info' },
                   { key: 'pipeline', label: 'Pipeline' },
                   { key: 'leads', label: `Leads (${agLeads.length})` },
-                  { key: 'tiempo', label: 'Tiempo' },
                   { key: 'comisiones', label: 'Comisiones' },
                 ]
                 const agentNotes = notes[ag.id] || ag.notes || []
                 
                 return (
-                  <div className="border rounded-2xl p-6 backdrop-blur-sm" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-5">
                     {/* Agent Header */}
                     <div className="flex items-center gap-4 mb-6">
-                      <div 
-                        className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold border-2"
-                        style={{ 
-                          backgroundColor: `${ag.color}22`, 
-                          borderColor: `${ag.color}55`, 
-                          color: ag.color 
-                        }}
-                      >
-                        {ag.name?.charAt(0).toUpperCase() || '?'}
-                      </div>
+                      <AgentAvatar initial={ag.name?.charAt(0).toUpperCase() || '?'} size="md" />
                       <div className="flex-1">
-                        <h2 className="text-xl font-bold" style={{ color: colors.foreground }}>{ag.name}</h2>
+                        <h2 className="text-xl font-bold text-white">{ag.name}</h2>
                         <div className="flex items-center gap-2 mt-1 text-sm">
-                          <span className="text-emerald-400">${(ag.revenue || 0).toLocaleString()}</span>
-                          <span style={{ color: colors.muted }}>•</span>
-                          <span className="text-emerald-400">{ag.conversionRate || 0}% conv.</span>
+                          <span className="text-emerald-400 font-medium">${(ag.revenue || 0).toLocaleString()}</span>
+                          <span className="text-slate-500">•</span>
+                          <span className="text-slate-400">{ag.conversionRate || 0}% conv.</span>
                         </div>
                       </div>
                       <Sparkline data={ag.weeklyTrend || [3,5,4,6,5,7,6]} color={ag.color} />
-                      {ag.isReal && (
-                        <button
+                      <button
                           onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true); }}
                           className="px-3 py-2 bg-red-500/15 border border-red-500/30 rounded-lg text-red-400 text-sm font-medium hover:bg-red-500/25 transition-colors flex items-center gap-2 shrink-0"
                           title="Eliminar agente"
@@ -695,24 +743,19 @@ const AgentsPage = ({ onNavigate }) => {
                           <Trash2 className="w-4 h-4" />
                           Eliminar
                         </button>
-                      )}
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-1 mb-6 border-b pb-0" style={{ borderColor: colors.border }}>
+                    <div className="flex gap-1 mb-6 border-b border-slate-800">
                       {tabs.map(t => (
                         <button
                           key={t.key}
                           onClick={() => setActiveTab(t.key)}
                           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                            activeTab === t.key 
-                              ? 'text-[colors.primary] border-[colors.primary]' 
-                              : 'border-transparent'
+                            activeTab === t.key
+                              ? 'text-blue-400 border-blue-500'
+                              : 'text-slate-500 border-transparent hover:text-slate-300'
                           }`}
-                          style={{
-                            color: activeTab === t.key ? 'colors.primary' : colors.muted,
-                            borderColor: activeTab === t.key ? 'colors.primary' : 'transparent',
-                          }}
                         >
                           {t.label}
                         </button>
@@ -723,109 +766,60 @@ const AgentsPage = ({ onNavigate }) => {
                     {activeTab === 'overview' && (
                       <div>
                         <div className="grid grid-cols-4 gap-3 mb-5">
-                          {[
-                            { label: 'Activos', val: ag.stats?.totalLeads || 0, color: '#818cf8', icon: '⚡' },
-                            { label: 'Cerrados', val: ag.stats?.closed || ag.stats?.byStatus?.respondio || 0, color: '#34d399', icon: '✓' },
-                            { label: 'Pendientes', val: ag.stats?.pendingFollowUps || 0, color: '#f59e0b', icon: '⏳' },
-                            { label: 'Esta semana', val: ag.stats?.weekLeads || 0, color: '#fb923c', icon: '📅' },
-                          ].map(s => (
-                            <div 
-                              key={s.label} 
-                              className="rounded-xl p-4 border"
-                              style={{ 
-                                backgroundColor: `${s.color}10`, 
-                                borderColor: `${s.color}25` 
-                              }}
-                            >
-                              <p className="text-2xl mb-1">{s.icon}</p>
-                              <p className="text-2xl font-bold" style={{ color: s.color }}>{s.val}</p>
-                              <p className="text-xs text-slate-600 mt-1">{s.label}</p>
-                            </div>
-                          ))}
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-3 mb-5">
-                          {[
-                            { label: 'Tasa de conversión', val: `${ag.conversionRate || 0}%`, color: (ag.conversionRate || 0) > 65 ? '#34d399' : (ag.conversionRate || 0) > 45 ? '#f59e0b' : '#ef4444' },
-                            { label: 'Tiempo prom. cierre', val: `${ag.avgCloseDays || 0}d`, color: '#818cf8' },
-                            { label: 'Revenue generado', val: `$${(ag.revenue || 0).toLocaleString()}`, color: '#34d399' },
-                          ].map(s => (
-                            <div 
-                              key={s.label}
-                              className="bg-[colors.card] border border-white/5 rounded-xl p-4"
-                            >
-                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">{s.label}</p>
-                              <p className="text-2xl font-bold" style={{ color: s.color }}>{s.val}</p>
-                            </div>
-                          ))}
+                          <KpiCard label="Leads activos" value={ag.stats?.totalLeads || 0} />
+                          <KpiCard label="Cerrados" value={ag.stats?.byStatus?.cerrado || ag.stats?.byStatus?.respondio || 0} valueClassName="text-emerald-400" />
+                          <KpiCard label="Conversión" value={`${ag.conversionRate || 0}%`} valueClassName={(ag.conversionRate || 0) > 65 ? 'text-emerald-400' : (ag.conversionRate || 0) > 45 ? 'text-amber-400' : 'text-rose-400'} />
+                          <KpiCard label="Tiempo cierre" value={`${ag.avgCloseDays || 0}d`} valueClassName="text-blue-400" />
                         </div>
 
-                        {/* Weekly Trend */}
-                        <div className="bg-[colors.card] border border-white/5 rounded-xl p-4">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">Tendencia semanal</p>
-                          <div className="flex items-end gap-2 h-12">
-                            {(ag.weeklyTrend || [3,5,4,6,5,7,6]).map((v, i) => {
-                              const max = Math.max(...(ag.weeklyTrend || [10]))
-                              const days = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
-                              return (
-                                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                                  <div 
-                                    className="w-full rounded-t"
-                                    style={{ 
-                                      height: `${(v / max) * 40}px`,
-                                      backgroundColor: `${ag.color}88`
-                                    }}
-                                  />
-                                  <span className="text-[10px] text-slate-600">{days[i]}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
+                        <WeeklyTrendChart
+                          data={ag.weeklyTrend || [3, 5, 4, 6, 5, 7, 6]}
+                          thisWeek={ag.stats?.weekLeads || 0}
+                        />
                       </div>
                     )}
 
                     {/* TAB: INFO */}
                     {activeTab === 'info' && (
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="border rounded-xl p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-                          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: colors.muted }}>Información de contacto</p>
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-3" style={{ color: colors.foreground }}>
-                              <Globe className="w-4 h-4" style={{ color: colors.muted }} />
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                          <p className="text-xs uppercase tracking-wide mb-3 text-slate-500">Información de contacto</p>
+                          <div className="space-y-3 text-slate-300">
+                            <div className="flex items-center gap-3">
+                              <Globe className="w-4 h-4 text-slate-500" />
                               <span>{ag.email || 'Sin email'}</span>
                             </div>
-                            <div className="flex items-center gap-3" style={{ color: colors.foreground }}>
-                              <Phone className="w-4 h-4" style={{ color: colors.muted }} />
+                            <div className="flex items-center gap-3">
+                              <Phone className="w-4 h-4 text-slate-500" />
                               <span>{ag.phone || 'Sin teléfono'}</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="border rounded-xl p-4" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-                          <p className="text-xs uppercase tracking-wide mb-3" style={{ color: colors.muted }}>Estadísticas</p>
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                          <p className="text-xs uppercase tracking-wide mb-3 text-slate-500">Estadísticas</p>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span style={{ color: colors.muted }}>Total leads</span>
-                              <span className="font-medium" style={{ color: colors.foreground }}>{ag.stats?.totalLeads || 0}</span>
+                              <span className="text-slate-500">Total leads</span>
+                              <span className="font-medium text-slate-200">{ag.stats?.totalLeads || 0}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span style={{ color: colors.muted }}>Leads perdidos</span>
+                              <span className="text-slate-500">Leads perdidos</span>
                               <span className="text-red-400 font-medium">{ag.stats?.lost || 0}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span style={{ color: colors.muted }}>Conversión</span>
+                              <span className="text-slate-500">Conversión</span>
                               <span className="text-emerald-400 font-medium">{ag.conversionRate || 0}%</span>
                             </div>
                             <div className="flex justify-between">
-                              <span style={{ color: colors.muted }}>Días promedio cierre</span>
-                              <span className="style={{ color: #ffffff }} font-medium">{ag.avgCloseDays || 0}</span>
+                              <span className="text-slate-500">Días promedio cierre</span>
+                              <span className="text-slate-200 font-medium">{ag.avgCloseDays || 0}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Notes Section */}
-                        <div className="col-span-2 bg-[colors.card] border border-white/5 rounded-xl p-4">
+                        <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
                           <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">Notas internas</p>
                           {agentNotes.length === 0 ? (
                             <p className="text-slate-600 text-sm mb-3">Sin notas aún.</p>
@@ -834,7 +828,7 @@ const AgentsPage = ({ onNavigate }) => {
                               {agentNotes.map((n, i) => (
                                 <div 
                                   key={i} 
-                                  className="bg-[colors.primary]/10 border border-[colors.primary]/20 rounded-lg py-2 px-3 text-sm text-[colors.primary]"
+                                  className="bg-blue-500/10 border border-blue-500/20 rounded-lg py-2 px-3 text-sm text-blue-300"
                                 >
                                   💬 {n}
                                 </div>
@@ -843,32 +837,57 @@ const AgentsPage = ({ onNavigate }) => {
                           )}
                           <div className="flex gap-2">
                             <input 
-value={newNote} 
-                                onChange={e => setNewNote(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleAddNote(ag.id)}
-                                placeholder="Agregar nota..." 
-                                className="flex-1 rounded-lg py-2 px-3 text-sm outline-none"
-                                style={{ 
-                                  backgroundColor: 'rgba(255,255,255,0.05)',
-                                  border: `1px solid ${colors.border}`,
-                                  color: colors.foreground,
-                                }}
-                              />
+                              value={newNote} 
+                              onChange={e => setNewNote(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && handleAddNote(ag.id)}
+                              placeholder="Agregar nota..." 
+                              className="flex-1 rounded-lg py-2 px-3 text-sm outline-none bg-slate-800 border border-slate-700 text-slate-200 placeholder-slate-500"
+                            />
                             <button 
                               onClick={() => handleAddNote(ag.id)}
-                              className="px-3 py-2 bg-[colors.primary]/20 border border-[colors.primary]/30 rounded-lg text-[colors.primary] text-sm font-medium hover:bg-[colors.primary]/30"
+                              className="px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-400 text-sm font-medium hover:bg-blue-500/30"
                             >
                               +
                             </button>
                           </div>
                         </div>
+
+                        {/* Vacaciones / disponibilidad */}
+                        <div className="col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4">
+                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">Días libres y disponibilidad</p>
+                          {(ag.vacations || []).length === 0 ? (
+                            <div className="bg-slate-800/50 border border-dashed border-white/10 rounded-xl p-6 text-center">
+                              <p className="text-xl mb-2">📅</p>
+                              <p className="text-slate-500 text-sm">Sin días libres registrados</p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              {(ag.vacations || []).map((v, i) => (
+                                <div 
+                                  key={i} 
+                                  className="flex items-center gap-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl"
+                                >
+                                  <span className="text-2xl">🏖️</span>
+                                  <div>
+                                    <p className="font-semibold text-emerald-400">{v.label}</p>
+                                    <p className="text-sm text-slate-500">{v.from} → {v.to}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <button onClick={() => setShowVacationModal(true)} className="mt-4 w-full py-3 bg-emerald-500/10 border border-dashed border-emerald-500/30 rounded-xl text-emerald-400 text-sm font-medium hover:bg-emerald-500/20 transition-colors">
+                            + Registrar día libre / vacaciones
+                          </button>
+                        </div>
                       </div>
                     )}
+
 
                     {/* TAB: PIPELINE */}
                     {activeTab === 'pipeline' && (
                       <div className="space-y-4">
-                        <p className="text-sm mb-4" style={{ color: colors.muted }}>Distribución de leads por etapa del embudo</p>
+                        <p className="text-sm mb-4 text-slate-500">Distribución de leads por etapa del embudo</p>
                         <FunnelChart pipeline={ag.pipeline || {}} color={ag.color} colors={colors} />
                         
                         <div className="grid grid-cols-5 gap-2 mt-4">
@@ -878,15 +897,11 @@ value={newNote}
                             return (
                               <div 
                                 key={s} 
-                                className="rounded-lg p-3 text-center"
-                                style={{ 
-                                  backgroundColor: `${cfg.color}10`, 
-                                  border: `1px solid ${cfg.color}25` 
-                                }}
+                                className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center"
                               >
                                 <p className="text-xl font-bold" style={{ color: cfg.color }}>{v}</p>
-                                <p className="text-xs" style={{ color: colors.muted }}>{cfg.label}</p>
-                                <p className="text-xs" style={{ color: colors.muted }}>{total > 0 ? ((v / total) * 100).toFixed(0) : 0}%</p>
+                                <p className="text-xs text-slate-500">{cfg.label}</p>
+                                <p className="text-xs text-slate-600">{total > 0 ? ((v / total) * 100).toFixed(0) : 0}%</p>
                               </div>
                             )
                           })}
@@ -899,7 +914,7 @@ value={newNote}
                       <div className="flex flex-col gap-2">
                         {agLeads.length === 0 ? (
                           <p className="text-slate-600 text-center py-8">
-                            {ag.isReal ? 'Sin leads asignados' : 'Sin leads de ejemplo'}
+                            Sin leads asignados
                           </p>
                         ) : (
                           agLeads.map(lead => {
@@ -908,17 +923,17 @@ value={newNote}
                             return (
                               <div 
                                 key={lead.id}
-                                className="flex items-center gap-4 p-3 bg-[colors.card] border border-white/5 rounded-xl hover:bg-slate-700/50 transition-colors cursor-pointer"
+                                className="flex items-center gap-4 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800/70 transition-colors cursor-pointer"
                               >
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-semibold style={{ color: #ffffff }}">{lead.lastActivity >= 10 && '🧊'}</span>
-                                    <span className="font-semibold style={{ color: #ffffff }}">{lead.name}</span>
-                                    {lead.notes?.length > 0 && <span className="text-xs text-[colors.primary]">💬 {lead.notes.length}</span>}
+                                    {lead.lastActivity >= 10 && <span className="text-sm">🧊</span>}
+                                    <span className="font-semibold text-slate-200">{lead.name}</span>
+                                    {lead.notes?.length > 0 && <span className="text-xs text-blue-400">💬 {lead.notes.length}</span>}
                                   </div>
-<div className="flex gap-2 items-center flex-wrap">
+                                  <div className="flex gap-2 items-center flex-wrap">
                                     {lead.channel && (
-                                      <span className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-400">
+                                      <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400">
                                         {lead.channel === 'facebook' && '📘 '}
                                         {lead.channel === 'instagram' && '📸 '}
                                         {lead.channel === 'whatsapp' && '💬 '}
@@ -954,59 +969,18 @@ value={newNote}
                       </div>
                     )}
 
-                    {/* TAB: TIEMPO/DISPONIBILIDAD */}
-                    {activeTab === 'tiempo' && (
-                      <div>
-                        <p className="text-sm text-slate-500 mb-4">Días libres y disponibilidad registrada</p>
-                        
-                        {(ag.vacations || []).length === 0 ? (
-                          <div className="bg-slate-800/50 border border-dashed border-white/10 rounded-xl p-8 text-center">
-                            <p className="text-2xl mb-2">📅</p>
-                            <p className="text-slate-500 text-sm">Sin días libres registrados</p>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            {(ag.vacations || []).map((v, i) => (
-                              <div 
-                                key={i} 
-                                className="flex items-center gap-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl"
-                              >
-                                <span className="text-2xl">🏖️</span>
-                                <div>
-                                  <p className="font-semibold text-emerald-400">{v.label}</p>
-                                  <p className="text-sm text-slate-500">{v.from} → {v.to}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        <button onClick={() => setShowVacationModal(true)} className="mt-4 w-full py-3 bg-emerald-500/10 border border-dashed border-emerald-500/30 rounded-xl text-emerald-400 text-sm font-medium hover:bg-emerald-500/20 transition-colors">
-                          + Registrar día libre / vacaciones
-                        </button>
-                        
-                        {/* Delete Agent Button */}
-                        {ag.isReal && (
-                          <button onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true); }} className="mt-3 w-full py-3 bg-red-500/10 border border-dashed border-red-500/30 rounded-xl text-red-400 text-sm font-medium hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2">
-                            <Trash2 className="w-4 h-4" />
-                            Eliminar agente
-                          </button>
-                        )}
-                      </div>
-                    )}
-
                     {/* TAB: COMISIONES */}
                     {activeTab === 'comisiones' && (
                       <div>
                         <div className="flex items-center justify-between mb-4">
-                          <p className="text-sm" style={{ color: colors.muted }}>Comisiones registradas</p>
+                          <p className="text-sm text-slate-500">Comisiones registradas</p>
                           <div className="flex items-center gap-2">
                             <input
                               type="month"
                               value={commissionsMonth}
                               onChange={(e) => {
                                 setCommissionsMonth(e.target.value)
-                                if (ag.isReal) fetchAgentCommissions(ag.id, e.target.value)
+                                fetchAgentCommissions(ag.id, e.target.value)
                               }}
                               className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
                             />
@@ -1015,34 +989,34 @@ value={newNote}
 
                         {commissionsLoading ? (
                           <div className="flex items-center justify-center py-12">
-                            <Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.muted }} />
+                            <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
                           </div>
                         ) : agentCommissions.length === 0 ? (
                           <div className="bg-slate-800/50 border border-dashed border-white/10 rounded-xl p-8 text-center">
-                            <DollarSign className="w-10 h-10 mx-auto mb-2" style={{ color: colors.muted }} />
-                            <p className="text-sm" style={{ color: colors.muted }}>Sin comisiones este mes</p>
+                            <DollarSign className="w-10 h-10 mx-auto mb-2 text-slate-500" />
+                            <p className="text-sm text-slate-500">Sin comisiones este mes</p>
                           </div>
                         ) : (
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                               <thead>
-                                <tr className="border-b" style={{ borderColor: colors.border }}>
-                                  <th className="text-left py-2 px-3 font-medium" style={{ color: colors.muted }}>Lead</th>
-                                  <th className="text-right py-2 px-3 font-medium" style={{ color: colors.muted }}>Monto</th>
-                                  <th className="text-right py-2 px-3 font-medium" style={{ color: colors.muted }}>%</th>
-                                  <th className="text-right py-2 px-3 font-medium" style={{ color: colors.muted }}>Comisión</th>
-                                  <th className="text-center py-2 px-3 font-medium" style={{ color: colors.muted }}>Estado</th>
-                                  <th className="text-right py-2 px-3 font-medium" style={{ color: colors.muted }}>Fecha</th>
+                                <tr className="border-b border-slate-800">
+                                  <th className="text-left py-2 px-3 font-medium text-slate-500">Lead</th>
+                                  <th className="text-right py-2 px-3 font-medium text-slate-500">Monto</th>
+                                  <th className="text-right py-2 px-3 font-medium text-slate-500">%</th>
+                                  <th className="text-right py-2 px-3 font-medium text-slate-500">Comisión</th>
+                                  <th className="text-center py-2 px-3 font-medium text-slate-500">Estado</th>
+                                  <th className="text-right py-2 px-3 font-medium text-slate-500">Fecha</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {agentCommissions.map(c => (
-                                  <tr key={c.id} className="border-b" style={{ borderColor: colors.border }}>
-                                    <td className="py-2.5 px-3" style={{ color: colors.foreground }}>{c.leadName || '—'}</td>
-                                    <td className="py-2.5 px-3 text-right font-medium" style={{ color: colors.foreground }}>
+                                  <tr key={c.id} className="border-b border-slate-800">
+                                    <td className="py-2.5 px-3 text-slate-200">{c.leadName || '—'}</td>
+                                    <td className="py-2.5 px-3 text-right font-medium text-slate-200">
                                       ${Number(c.propertyPrice || 0).toLocaleString()}
                                     </td>
-                                    <td className="py-2.5 px-3 text-right" style={{ color: colors.muted }}>{c.percentage}%</td>
+                                    <td className="py-2.5 px-3 text-right text-slate-500">{c.percentage}%</td>
                                     <td className="py-2.5 px-3 text-right font-semibold text-emerald-400">
                                       ${Number(c.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                                     </td>
@@ -1052,7 +1026,7 @@ value={newNote}
                                         : <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded-full text-xs font-medium">Pendiente</span>
                                       }
                                     </td>
-                                    <td className="py-2.5 px-3 text-right text-xs" style={{ color: colors.muted }}>
+                                    <td className="py-2.5 px-3 text-right text-xs text-slate-500">
                                       {new Date(c.createdAt).toLocaleDateString('es-AR')}
                                     </td>
                                   </tr>
@@ -1064,7 +1038,7 @@ value={newNote}
 
                         {agentCommissions.length > 0 && (
                           <div className="mt-4 flex justify-between items-center p-3 bg-slate-800/50 rounded-xl">
-                            <span className="text-sm" style={{ color: colors.muted }}>Total comisiones</span>
+                            <span className="text-sm text-slate-500">Total comisiones</span>
                             <span className="text-lg font-bold text-emerald-400">
                               ${agentCommissions.reduce((s, c) => s + Number(c.amount), 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                             </span>
@@ -1080,154 +1054,100 @@ value={newNote}
 
           {/* VIEW: ANALYTICS */}
           {globalView === 'analytics' && (
-            <div className="flex flex-col gap-5">
-              {/* KPI Row */}
-              <div className="grid grid-cols-4 gap-4">
-                {[
-                  { label: 'Revenue Total', val: `$${totalRevenue.toLocaleString()}`, sub: 'todos los agentes', color: 'colors.primary', icon: '💰' },
-                  { label: 'Conv. Promedio', val: `${avgConversion}%`, sub: 'tasa de conversión', color: 'colors.primary', icon: '🎯' },
-                  { label: 'Leads Activos', val: totalActiveLeads, sub: 'en proceso ahora', color: '#fb923c', icon: '⚡' },
-                  { label: 'Leads Cerrados', val: totalClosedLeads, sub: 'total histórico', color: '#34d399', icon: '✓' },
-                ].map(k => (
-                  <div 
-                    key={k.label}
-                    className="bg-[colors.card] border border-white/5 rounded-2xl p-5"
-                  >
-                    <div className="text-3xl mb-3">{k.icon}</div>
-                    <p className="text-3xl font-bold" style={{ color: k.color }}>{k.val}</p>
-                    <p className="text-sm text-slate-500 mt-2">{k.sub}</p>
-                    <p className="text-xs text-slate-600 uppercase tracking-wide mt-1">{k.label}</p>
-                  </div>
-                ))}
+            <div className="bg-[#0c1220] rounded-xl p-5">
+              <div className="grid grid-cols-4 gap-2.5 mb-3">
+                <SummaryCard
+                  icon={DollarSign}
+                  label="Revenue total"
+                  value={`$${totalRevenue.toLocaleString('es-MX')}`}
+                  hint="Todos los agentes"
+                />
+                <SummaryCard
+                  icon={Target}
+                  label="Conv. promedio"
+                  value={`${avgConversion}%`}
+                  hint="Tasa de conversión"
+                />
+                <SummaryCard
+                  icon={Zap}
+                  label="Leads activos"
+                  value={totalActiveLeads}
+                  hint="En proceso ahora"
+                />
+                <SummaryCard
+                  icon={Check}
+                  label="Leads cerrados"
+                  value={totalClosedLeads}
+                  hint="Total histórico"
+                />
               </div>
 
-              {/* Charts Row */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Revenue by Agent */}
-                <div className="border rounded-2xl p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-                  <p className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: colors.muted }}>💰 Revenue por Agente</p>
-                  <div className="space-y-3">
-                    {[...allAgents].sort((a, b) => (b.revenue || 0) - (a.revenue || 0)).map(ag => {
-                      const maxRev = Math.max(...allAgents.map(a => a.revenue || 0))
-                      const pct = maxRev > 0 ? ((ag.revenue || 0) / maxRev) * 100 : 0
-                      return (
-                        <div key={ag.id}>
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm" style={{ color: colors.foreground }}>{ag.name?.split(' ')[0]}</span>
-                            <span className="text-sm font-bold" style={{ color: colors.primary }}>${(ag.revenue || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                            <div 
-                              className="h-full rounded-full transition-all duration-300"
-                              style={{ width: `${pct}%`, backgroundColor: ag.color }}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
+              <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+                <div className="bg-slate-900 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-3">Revenue por agente</div>
+                  <div className="flex flex-col gap-2.5">
+                    {[...allAgents].sort((a, b) => (b.revenue || 0) - (a.revenue || 0)).map(a => (
+                      <BarRow
+                        key={a.id}
+                        label={a.name.split(' ')[0]}
+                        valueLabel={`$${(a.revenue || 0).toLocaleString('es-MX')}`}
+                        percent={totalRevenue > 0 ? ((a.revenue || 0) / totalRevenue) * 100 : 0}
+                        color="#2563eb"
+                      />
+                    ))}
                   </div>
                 </div>
 
-                {/* Conversion by Agent */}
-                <div className="border rounded-2xl p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-                  <p className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: colors.muted }}>🎯 Conversión por Agente</p>
-                  <div className="space-y-3">
-                    {[...allAgents].sort((a, b) => (b.conversionRate || 0) - (a.conversionRate || 0)).map(ag => (
-                      <div key={ag.id} className="flex items-center gap-3">
-                        <div 
-                          className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
-                          style={{ backgroundColor: `${ag.color}22`, color: ag.color }}
-                        >
-                          {ag.name?.charAt(0)}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between mb-1">
-                            <span className="text-sm text-slate-400">{ag.name?.split(' ')[0]}</span>
-                            <span className="text-sm font-bold" style={{ color: (ag.conversionRate || 0) > 65 ? '#34d399' : (ag.conversionRate || 0) > 45 ? '#f59e0b' : '#ef4444' }}>
-                              {ag.conversionRate || 0}%
-                            </span>
-                          </div>
-                          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full"
-                              style={{ 
-                                width: `${ag.conversionRate || 0}%`,
-                                backgroundColor: (ag.conversionRate || 0) > 65 ? '#34d399' : (ag.conversionRate || 0) > 45 ? '#f59e0b' : '#ef4444'
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                <div className="bg-slate-900 rounded-lg p-4">
+                  <div className="text-xs text-slate-400 mb-3">Conversión por agente</div>
+                  <div className="flex flex-col gap-2.5">
+                    {[...allAgents].sort((a, b) => (b.conversionRate || 0) - (a.conversionRate || 0)).map(a => (
+                      <BarRow
+                        key={a.id}
+                        label={a.name.split(' ')[0]}
+                        valueLabel={`${a.conversionRate || 0}%`}
+                        percent={a.conversionRate || 0}
+                        color={conversionColor(a.conversionRate || 0)}
+                      />
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Avg Close Days */}
-              <div className="border rounded-2xl p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-                <p className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: colors.muted }}>⏱ Tiempo Promedio de Cierre (días)</p>
-                <div className="grid grid-cols-4 gap-3">
-                  {[...allAgents].sort((a, b) => (a.avgCloseDays || 0) - (b.avgCloseDays || 0)).map((ag, i) => (
-                    <div 
-                      key={ag.id}
-                      className="border rounded-xl p-4 text-center"
-                      style={{ backgroundColor: colors.card, borderColor: colors.border }}
-                    >
-                      <div 
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold mx-auto mb-2"
-                        style={{ backgroundColor: `${ag.color}22`, color: ag.color }}
-                      >
-                        {ag.name?.charAt(0)}
-                      </div>
-                      <p className="text-2xl font-bold" style={{ color: colors.foreground }}>{ag.avgCloseDays || 0}</p>
-                      <p className="text-xs" style={{ color: colors.muted }}>días</p>
-                      <p className="text-xs truncate mt-1" style={{ color: colors.muted }}>{ag.name?.split(' ')[0]}</p>
-                    </div>
+              <div className="bg-slate-900 rounded-lg p-4 mb-2.5">
+                <div className="text-xs text-slate-400 mb-3">
+                  Tiempo promedio de cierre (días)
+                </div>
+                <div className="flex flex-col gap-2">
+                  {[...allAgents].sort((a, b) => (a.avgCloseDays || 0) - (b.avgCloseDays || 0)).map(a => (
+                    <ClosingTimeRow
+                      key={a.id}
+                      label={a.name.split(' ')[0]}
+                      days={a.avgCloseDays || 0}
+                      percent={maxCloseDays > 0 ? ((a.avgCloseDays || 0) / maxCloseDays) * 100 : 0}
+                      color={closingColor(a.avgCloseDays || 0)}
+                    />
                   ))}
                 </div>
               </div>
 
-              {/* Leaderboard */}
-              <div className="border rounded-2xl p-5" style={{ backgroundColor: colors.card, borderColor: colors.border }}>
-                <p className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: colors.muted }}>🏆 Ranking de Agentes</p>
-                <div className="flex flex-col gap-3">
-                  {[...allAgents].sort((a, b) => (b.conversionRate || 0) - (a.conversionRate || 0)).map((ag, i) => (
-                    <div 
-                      key={ag.id}
-                      className="flex items-center gap-4 p-3 border rounded-xl"
-                      style={{ backgroundColor: 'rgba(13,32,53,0.5)', borderColor: colors.border }}
-                    >
-                      <span className="text-xl w-8 text-center">
-                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
-                      </span>
-                      <div 
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold border"
-                        style={{ 
-                          backgroundColor: `${ag.color}22`, 
-                          borderColor: `${ag.color}44`, 
-                          color: ag.color 
-                        }}
-                      >
-                        {ag.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold style={{ color: #ffffff }}">{ag.name}</p>
-                        <div className="flex gap-2 mt-1">
-                          <span className="text-xs text-emerald-400 bg-emerald-400/15 px-2 py-0.5 rounded">
-                            {ag.conversionRate || 0}% conv.
-                          </span>
-                          <span className="text-xs text-cyan-400 bg-cyan-400/15 px-2 py-0.5 rounded">
-                            {ag.avgCloseDays || 0}d cierre
-                          </span>
-                          <span className="text-xs text-[colors.primary] bg-[colors.primary]/15 px-2 py-0.5 rounded">
-                            ${(ag.revenue || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="w-24">
-                        <Sparkline data={ag.weeklyTrend || [3,5,4,6,5,7,6]} color={ag.color} />
-                      </div>
-                    </div>
+              <div className="bg-slate-900 rounded-lg p-4">
+                <div className="text-xs text-slate-400 mb-3">Ranking de agentes</div>
+                <div className="flex flex-col">
+                  {[...allAgents].sort((a, b) => (b.revenue || 0) - (a.revenue || 0)).map((a, i) => (
+                    <RankingRow
+                      key={a.id}
+                      position={i + 1}
+                      agent={{
+                        id: a.id,
+                        name: a.name,
+                        initial: a.name?.charAt(0).toUpperCase() || '?',
+                        revenue: a.revenue || 0,
+                        conversion: a.conversionRate || 0,
+                        closingDays: a.avgCloseDays || 0,
+                      }}
+                      isTop={i === 0}
+                    />
                   ))}
                 </div>
               </div>
@@ -1367,6 +1287,11 @@ value={newNote}
             </div>
           )}
 
+          {/* VIEW: COMMISSIONS */}
+          {globalView === 'commissions' && (
+            <CommissionsView user={user} agents={realAgents} />
+          )}
+
 {/* New Agent Modal - with phone */}
       {showCreateUser && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreateUser(false)}>
@@ -1411,17 +1336,10 @@ value={newNote}
               </div>
               <div>
                 <label className="block text-sm mb-2" style={{ color: colors.muted }}>Teléfono</label>
-                <input
-                  type="tel"
+                <PhoneInput
                   value={newUser.phone}
-                  onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
-                  placeholder=""
-                  className="w-full px-4 py-3 rounded-xl outline-none"
-                  style={{ 
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${colors.border}`,
-                    color: colors.foreground,
-                  }}
+                  onChange={value => setNewUser({ ...newUser, phone: value })}
+                  placeholder="+54 11 1234-5678"
                 />
               </div>
               <div>
@@ -1696,19 +1614,22 @@ value={newNote}
                   }
                   setDeleting(true)
                   try {
-                    const res = await api.delete(`/users/${selectedAgent.id}`)
+                    const res = await api.delete(`/auth/admin/users/${selectedAgent.id}`)
                     if (res.ok) {
                       toast.success('Agente eliminado correctamente')
                       setShowDeleteModal(false)
                       // Refresh the agent list
                       const workloadRes = await api.get('/assignment/workload')
                       const workloadData = await workloadRes.json()
+                      const statsRes = await api.get('/stats/agents').catch(() => ({ ok: true, json: async () => ({ agents: [] }) }))
+                      const statsData = await statsRes.json()
+                      const realStats = {}
+                      for (const s of (statsData.agents || [])) realStats[s.id] = s
                       const realWithColor = (workloadData.workload || []).map((agent, idx) => ({
                         ...agent,
-                        isReal: true,
-                        color: getRandomColor(idx + EXAMPLE_AGENTS.length),
-                        weeklyTrend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 10) + 2),
-                        revenue: Math.floor(Math.random() * 200000) + 50000,
+                        color: getRandomColor(idx),
+                        weeklyTrend: realStats[agent.id]?.weeklyTrend || Array.from({ length: 7 }, () => 0),
+                        revenue: realStats[agent.id]?.revenue || 0,
                         stats: { 
                           totalLeads: agent.leadCount || 0,
                           closed: Math.floor((agent.leadCount || 0) * 0.6),
@@ -1718,12 +1639,12 @@ value={newNote}
                           monthLeads: Math.floor((agent.leadCount || 0) * 0.5),
                           byStatus: {}
                         },
-                        conversionRate: Math.floor(Math.random() * 30) + 50,
-                        avgCloseDays: Math.floor(Math.random() * 10) + 5,
-                        phone: agent.phone || '',
+                        conversionRate: realStats[agent.id]?.conversionRate || 0,
+                        avgCloseDays: realStats[agent.id]?.avgCloseDays || 0,
+                        phone: realStats[agent.id]?.phone || '',
                         email: agent.email || '',
                         vacations: [],
-                        pipeline: { nuevo: 2, contactado: 3, propuesta: 2, negociacion: 1, cerrado: Math.floor((agent.leadCount || 0) * 0.5) },
+                        pipeline: realStats[agent.id]?.pipeline || {},
                         notes: []
                       }))
                       setRealAgents(realWithColor)
