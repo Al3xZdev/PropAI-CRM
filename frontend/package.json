@@ -11,9 +11,11 @@
     "vercel:prod": "vercel --prod"
   },
   "dependencies": {
+    "libphonenumber-js": "^1.13.10",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-phone-number-input": "^3.4.17",
     "sonner": "^2.0.8"
   },
   "devDependencies": {
