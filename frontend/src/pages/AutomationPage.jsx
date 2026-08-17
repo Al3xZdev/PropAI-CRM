@@ -9,13 +9,7 @@ import {
 } from 'lucide-react'
 import SequenceBuilderV2 from '../components/automation/SequenceBuilderV2'
 import SequenceList from '../components/automation/SequenceList'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-  'Content-Type': 'application/json'
-})
+import { api } from '../utils/api'
 
 // Channel icons and colors
 const CHANNEL_CONFIG = {
@@ -722,8 +716,8 @@ export default function AutomationPage() {
     setLoading(true)
     try {
       const [leadsRes, sequencesRes] = await Promise.all([
-        fetch(`${API_URL}/leads`, { headers: getAuthHeaders() }),
-        fetch(`${API_URL}/automation/sequences`, { headers: getAuthHeaders() })
+        api.get('/leads'),
+        api.get('/automation/sequences')
       ])
 
       if (leadsRes.ok) {
@@ -744,7 +738,7 @@ export default function AutomationPage() {
         }
         for (const seq of data.sequences || []) {
           try {
-            const leadsRes = await fetch(`${API_URL}/automation/sequences/${seq.id}/leads`, { headers: getAuthHeaders() })
+            const leadsRes = await api.get(`/automation/sequences/${seq.id}/leads`)
             if (leadsRes.ok) {
               const leadsData = await leadsRes.json()
               if (leadsData.leads && Array.isArray(leadsData.leads)) {
@@ -765,11 +759,7 @@ export default function AutomationPage() {
   }
 
   const saveSequence = async (sequence) => {
-    const response = await fetch(`${API_URL}/automation/sequences/${sequence.id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(sequence)
-    })
+    const response = await api.put(`/automation/sequences/${sequence.id}`, sequence)
     
     if (!response.ok) throw new Error('Error al guardar')
     
@@ -780,11 +770,7 @@ export default function AutomationPage() {
   const generateAlternatives = async (step, lead) => {
     setGeneratingAlternatives(true)
     try {
-      const response = await fetch(`${API_URL}/automation/generate-alternatives`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ step, lead })
-      })
+      const response = await api.post('/automation/generate-alternatives', { step, lead })
       
       if (response.ok) {
         const data = await response.json()
@@ -812,16 +798,12 @@ export default function AutomationPage() {
         .replace(/{{agentName}}/g, 'Tu Asesor')
 
       // Send (simulated)
-      await fetch(`${API_URL}/automation/send`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          lead,
-          channel,
-          message,
-          stepId: step.id,
-          sequenceId: activeSequence?.id
-        })
+      await api.post('/automation/send', {
+        lead,
+        channel,
+        message,
+        stepId: step.id,
+        sequenceId: activeSequence?.id
       })
 
       // Reload data to update
@@ -836,10 +818,7 @@ export default function AutomationPage() {
 
   const pauseLeadAutomation = async (leadId) => {
     try {
-      const response = await fetch(`${API_URL}/leads/${leadId}/automation/pause`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      })
+      const response = await api.post(`/leads/${leadId}/automation/pause`)
       if (response.ok) {
         setLeadsInAutomation(prev => ({
           ...prev,
@@ -854,10 +833,7 @@ export default function AutomationPage() {
 
   const resumeLeadAutomation = async (leadId) => {
     try {
-      const response = await fetch(`${API_URL}/leads/${leadId}/automation/resume`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      })
+      const response = await api.post(`/leads/${leadId}/automation/resume`)
       if (response.ok) {
         setLeadsInAutomation(prev => ({
           ...prev,
@@ -874,11 +850,7 @@ export default function AutomationPage() {
   const startLeadAutomation = async (leadId, sequenceId) => {
     try {
       // First add lead to sequence
-      const addRes = await fetch(`${API_URL}/automation/sequences/${sequenceId}/leads`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ leadIds: [leadId] })
-      })
+      const addRes = await api.post(`/automation/sequences/${sequenceId}/leads`, { leadIds: [leadId] })
       
       if (!addRes.ok) {
         const error = await addRes.json()
@@ -887,11 +859,7 @@ export default function AutomationPage() {
       }
       
       // Then start automation
-      const startRes = await fetch(`${API_URL}/leads/${leadId}/start-automation`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ sequenceId })
-      })
+      const startRes = await api.post(`/leads/${leadId}/start-automation`, { sequenceId })
       
       if (startRes.ok) {
         setLeadsInAutomation(prev => ({
@@ -915,7 +883,7 @@ export default function AutomationPage() {
   const stats = {
     totalLeads: leads.length,
     inAutomation: leads.filter(l => Object.values(leadsInAutomation).some(seqLeads => seqLeads.some(sl => sl.id === l.id))).length,
-    paused: leads.filter(l => l.status === 'pausado').length,
+    paused: leads.filter(l => l.automationPaused).length,
     pending: leads.filter(l => l.status !== 'respondio' && l.status !== 'perdido').length
   }
 
@@ -997,8 +965,6 @@ export default function AutomationPage() {
           sequences={sequences}
           leads={leads}
           leadsInSequences={leadsInAutomation}
-          apiUrl={API_URL}
-          getAuthHeaders={getAuthHeaders}
           onCreateNew={() => {
             setActiveSequence(null)
             setShowBuilder(true)
@@ -1009,13 +975,12 @@ export default function AutomationPage() {
           }}
           onRefresh={loadData}
           onDeleteSequence={async (seq) => {
-            const res = await fetch(`${API_URL}/automation/sequences/${seq.id}`, {
-              method: 'DELETE',
-              headers: getAuthHeaders()
-            })
-            if (res.ok) {
-              loadData()
+            const res = await api.delete(`/automation/sequences/${seq.id}`)
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}))
+              throw new Error(data.error || 'Error al eliminar la secuencia')
             }
+            await loadData()
           }}
         />
 </AnimatedCard>

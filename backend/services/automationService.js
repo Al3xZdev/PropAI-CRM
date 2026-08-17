@@ -60,6 +60,66 @@ const sequences = allSequences.filter(s => s.tenantId);
   } catch (error) {
     console.error('❌ Error en proceso de automatización:', error.message);
   }
+
+  // Chequeo de follow-ups vencidos/próximos (no debe romper el procesamiento de secuencias)
+  await checkFollowUpNotifications(prisma).catch(err => {
+    console.error('❌ Error en chequeo de follow-ups:', err.message);
+  });
+}
+
+/**
+ * Notificar follow-ups vencidos o próximos a vencer (24h).
+ * Destinatario: lead.assignedTo si existe, si no followUp.createdBy.
+ * Dedupe: no crear si ya existe notificación 'followup_due' no leída para el mismo userId + leadId.
+ */
+async function checkFollowUpNotifications(prisma) {
+  const now = new Date();
+  const cutoff = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  const followUps = await prisma.followUp.findMany({
+    where: {
+      completedAt: null,
+      scheduledAt: { lte: cutoff }
+    },
+    include: {
+      lead: { select: { id: true, name: true, assignedTo: true } }
+    }
+  });
+
+  for (const followUp of followUps) {
+    const recipient = followUp.lead?.assignedTo || followUp.createdBy;
+    if (!recipient || recipient === 'system') continue;
+
+    const existing = await prisma.notification.findFirst({
+      where: {
+        tenantId: followUp.tenantId,
+        userId: recipient,
+        type: 'followup_due',
+        leadId: followUp.leadId,
+        read: false
+      }
+    });
+    if (existing) continue;
+
+    const isOverdue = followUp.scheduledAt < now;
+    const formattedDate = followUp.scheduledAt.toLocaleString('es-AR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+    const leadName = followUp.lead?.name || 'Lead';
+
+    await prisma.notification.create({
+      data: {
+        tenantId: followUp.tenantId,
+        userId: recipient,
+        type: 'followup_due',
+        title: isOverdue ? 'Tarea vencida' : 'Tarea próxima a vencer',
+        description: `${leadName}: ${followUp.note || 'Seguimiento'} (${formattedDate})`,
+        leadId: followUp.leadId,
+        channel: 'followup'
+      }
+    });
+  }
 }
 
 /**
@@ -120,15 +180,10 @@ let stepToExecute = null;
     const day = step.day || i + 1;
     
     if (daysSinceStart >= day) {
-      // Ya pasó el tiempo para este paso, verificar si ya se envió
-const followUpCount = await prisma.followUp.count({
-        where: {
-          leadId: lead.id,
-          day: day
-        }
-      });
-      
-      if (followUpCount === 0 && step.message && step.message.trim().length > 0) {
+      // Ya pasó el tiempo para este paso. El dedupe por "día" no es posible
+      // (FollowUp no tiene campo day); la fuente de verdad es currentStep,
+      // y el envío se deduplica por nota del mensaje más abajo.
+      if (step.message && step.message.trim().length > 0) {
         stepToExecute = { step, day };
         break;
       }
@@ -149,6 +204,19 @@ let message = step.message || '';
   // Reemplazar variables en el mensaje
   message = replaceVariables(message, lead);
   
+  // Dedupe: si este mensaje ya fue registrado como follow-up, avanzar sin reenviar
+  const alreadySent = await prisma.followUp.count({
+    where: { leadId: lead.id, note: message }
+  });
+  if (alreadySent > 0) {
+    await prisma.leadSequence.update({
+      where: { id: leadSequence.id },
+      data: { currentStep: currentStep + 1 }
+    });
+    console.log(`⏭️ [${sequence.name}] Lead ${lead.name}: mensaje del día ${day} ya registrado, se avanza al siguiente paso`);
+    return;
+  }
+  
   // Enviar el mensaje
 const result = await sendMessage(prisma, lead, channel, message, sequence.name);
   
@@ -156,14 +224,13 @@ const result = await sendMessage(prisma, lead, channel, message, sequence.name);
     // Registrar el follow-up enviado
     await prisma.followUp.create({
       data: {
+        tenantId: lead.tenantId,
         leadId: lead.id,
-        day: day,
-        channel: channel,
-        message: message,
-        automated: true,
-        sentAt:
-new Date(),
-        whatsappMessageId: result.messageId || null
+        createdBy: 'system',
+        type: 'automation',
+        note: message,
+        scheduledAt: new Date(),
+        completedAt: new Date()
       }
     });
     
@@ -180,18 +247,21 @@ new Date(),
 new Date() }
     });
     
-    // Crear notificación
-    await prisma.notification.create({
-      data: {
-        tenantId: lead.tenantId,
-        userId: leadSequence.userId || leadSequence.userId,
-        type: 'message_sent',
-        title: 'Mensaje automatizado enviado',
-        description: `Día ${day}: Mensaje enviado a ${lead.name} por ${channel}`,
-        leadId: lead.id,
-        channel: channel
-      }
-    });
+    // Crear notificación (solo si hay un destinatario real: userId del leadSequence o agente asignado)
+    const messageSentUserId = leadSequence.userId || lead.assignedTo || null;
+    if (messageSentUserId) {
+      await prisma.notification.create({
+        data: {
+          tenantId: lead.tenantId,
+          userId: messageSentUserId,
+          type: 'message_sent',
+          title: 'Mensaje automatizado enviado',
+          description: `Día ${day}: Mensaje enviado a ${lead.name} por ${channel}`,
+          leadId: lead.id,
+          channel: channel
+        }
+      });
+    }
     
     console.log(`✅ Enviado: Lead ${lead.name} - Día ${day} - Canal ${channel}`);
     
@@ -216,17 +286,19 @@ new Date(),
         }
       });
       
-      // Notificar secuencia completada
-      await prisma.notification.create({
-        data: {
-          tenantId: lead.tenantId,
-          userId: leadSequence.userId,
-          type: 'sequence_completed',
-          title: 'Secuencia completada',
-          description: `${lead.name} completó la secuencia "${sequence.name}"`,
-          leadId: lead.id
-        }
-      });
+      // Notificar secuencia completada (solo si hay destinatario)
+      if (messageSentUserId) {
+        await prisma.notification.create({
+          data: {
+            tenantId: lead.tenantId,
+            userId: messageSentUserId,
+            type: 'sequence_completed',
+            title: 'Secuencia completada',
+            description: `${lead.name} completó la secuencia "${sequence.name}"`,
+            leadId: lead.id
+          }
+        });
+      }
       
       console.log(`🎉 Secuencia completada para ${lead.name}`);
     }
