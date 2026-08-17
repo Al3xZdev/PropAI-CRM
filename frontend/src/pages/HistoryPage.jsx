@@ -3,13 +3,7 @@ import {
   History, Instagram, Facebook, Music, Globe, Twitter,
   Calendar, Clock, Building2, CheckCircle2, Filter
 } from 'lucide-react'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-  'Content-Type': 'application/json'
-})
+import { api } from '../utils/api'
 
 const HistoryPage = () => {
   const [publications, setPublications] = useState([])
@@ -22,7 +16,7 @@ const HistoryPage = () => {
 
   const loadPublications = async () => {
     try {
-      const response = await fetch(`${API_URL}/schedule/history`, { headers: getAuthHeaders() })
+      const response = await api.get('/schedule/history')
       if (response.ok) {
         const data = await response.json()
         setPublications(data.publications || [])

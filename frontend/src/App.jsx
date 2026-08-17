@@ -19,7 +19,9 @@ import ScheduleModal from './components/ScheduleModal'
 import CopywritingContent from './components/CopywritingContent'
 import PropertyImportCSV from './components/PropertyImportCSV'
 import ScheduleSuccessPopup from './components/ScheduleSuccessPopup'
+import { Toaster } from 'sonner'
 import { useNotifications, NOTIFICATION_TYPES } from './hooks/useNotifications'
+import { api } from './utils/api'
 import { 
   Sparkles, Building2, FileText, Calendar, Eye, 
   Plus, Loader2, X, Copy, Send, ArrowLeft, Search
@@ -78,9 +80,7 @@ function App() {
       try {
         // Verificar que el token de la cookie sigue siendo válido
         // Usamos credentials: 'include' para que se envíen las cookies automáticamente
-        const response = await fetch(`${API_URL}/auth/me`, {
-          credentials: 'include' // Importante: enviar cookies
-        })
+        const response = await api.get('/auth/me')
         
         if (response.ok) {
           const apiUser = await response.json()
@@ -112,10 +112,7 @@ function App() {
   const logout = async () => {
     // Llamar al backend para invalidar el refresh token y limpiar cookies
     try {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      })
+      await api.post('/auth/logout')
     } catch (e) {
       // Ignorar errores en logout
     }
@@ -131,23 +128,10 @@ function App() {
     setLeadsStats({})
   }
 
-  // Helper to get auth headers - usa cookies automáticamente
-  const getAuthHeaders = () => {
-    // Ya no necesitamos el token del localStorage porque:
-    // 1. Las cookies httpOnly se envían automáticamente con credentials: 'include'
-    // 2. El backend acepta tanto cookies como Authorization header (fallback)
-    return {
-      'Content-Type': 'application/json'
-    }
-  }
-
   const loadProperties = async () => {
     try {
       // Las cookies se envían automáticamente con credentials: 'include'
-      const response = await fetch(`${API_URL}/properties`, { 
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      })
+      const response = await api.get('/properties')
       if (response.ok) {
         const data = await response.json()
         setProperties(data.properties || [])
@@ -162,10 +146,7 @@ function App() {
   const loadLeadsStats = async () => {
     try {
       // Las cookies se envían automáticamente con credentials: 'include'
-      const response = await fetch(`${API_URL}/leads/stats/summary`, { 
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      })
+      const response = await api.get('/leads/stats/summary')
       if (response.ok) {
         const data = await response.json()
         setLeadsStats(data)
@@ -203,13 +184,7 @@ function App() {
         propertyFormData.append('images', file)
       })
 
-      const propertyResponse = await fetch(`${API_URL}/properties`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        },
-        body: propertyFormData
-      })
+      const propertyResponse = await api.upload('/properties', propertyFormData)
       
       if (!propertyResponse.ok) {
         const errorData = await propertyResponse.json()
@@ -241,27 +216,13 @@ function App() {
   }
 
   const generateContent = async (property) => {
-    const response = await fetch(`${API_URL}/content/generate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ property })
-    })
+    const response = await api.post('/content/generate', { property })
     if (!response.ok) throw new Error('Error al generar contenido')
     return response.json()
   }
 
   const generateSchedule = async (property, content) => {
-    const response = await fetch(`${API_URL}/schedule/create`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ property, content })
-    })
+    const response = await api.post('/schedule/create', { property, content })
     if (!response.ok) throw new Error('Error al generar calendario')
     return response.json()
   }
@@ -269,9 +230,7 @@ function App() {
   const handleSelectProperty = async (propertyId) => {
     setIsGenerating(true)
     try {
-      const response = await fetch(`${API_URL}/properties/${propertyId}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
-      })
+      const response = await api.get(`/properties/${propertyId}`)
       if (response.ok) {
         const data = await response.json()
         setSelectedProperty(data.property)
@@ -301,10 +260,7 @@ function App() {
     e?.stopPropagation()
     if (confirm('¿Eliminar esta propiedad?')) {
       try {
-        await fetch(`${API_URL}/properties/${propertyId}`, { 
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
-        })
+        await api.delete(`/properties/${propertyId}`)
         await loadProperties()
         if (selectedProperty?.id === propertyId) {
           setSelectedProperty(null)
@@ -316,111 +272,78 @@ function App() {
     }
   }
 
-  const handlePublish = async (postIndex) => {
-    if (!schedule) return
-    
+  // Real publish to the backend (calls POST /schedule/:scheduleId/publish/:postIndex)
+  // Can receive: (platform, post) from ScheduleTimeline, or (postIndex) from PublicationPanel
+  const handlePublish = async (platformOrIndex, post) => {
+    if (!schedule || !schedule.posts) return
+
+    // Determine which post and index to publish
+    let postIndex
+    if (typeof platformOrIndex === 'number') {
+      postIndex = platformOrIndex
+      post = schedule.posts[postIndex]
+    } else {
+      postIndex = post ? schedule.posts.findIndex(p => p.id === post.id) : -1
+    }
+
+    if (postIndex === -1 || postIndex === undefined || !post) return
+
     // Get the first image URL from the property
-    // For testing, use a sample image URL if local image doesn't work
-    let imageUrl = selectedProperty?.images?.[0]?.url || property?.images?.[0]?.url
-    
+    let imageUrl = selectedProperty?.images?.[0]?.url
+
     // If it's a local localhost URL, use a sample public image for testing
     if (imageUrl && imageUrl.includes('localhost')) {
       imageUrl = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800'
     }
-    
+
     // Fallback to a sample image if no image available
     if (!imageUrl) {
       imageUrl = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800'
     }
-    
-    try {
-      const response = await fetch(`${API_URL}/schedule/${schedule.id}/publish/${postIndex}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ imageUrl })
-      })
-      if (response.ok) {
-        const result = await response.json()
-        const updatedPosts = [...schedule.posts]
-        updatedPosts[postIndex] = result.post
-        setSchedule({ ...schedule, posts: updatedPosts })
-      }
-    } catch (err) {
-      console.error('Error publishing:', err)
-    }
-  }
-  
-  // Simulated publish for demo (shows popup animation)
-  // Can receive: (platform, updatedPost) or just platform
-  const handleSimulatedPublish = (platformOrIndex, updatedPost) => {
-    console.log('🎯 handleSimulatedPublish called with:', platformOrIndex, updatedPost)
-    
-    // Determine platform
-    let platform = 'Instagram'
-    let postIndex = null
-    
-    if (typeof platformOrIndex === 'string') {
-      // Called from PostDetailModal or ScheduleTimeline (platform name)
-      platform = platformOrIndex
-    } else if (typeof platformOrIndex === 'number') {
-      // Called from PublicationPanel (post index)
-      postIndex = platformOrIndex
-      if (schedule?.posts?.[postIndex]) {
-        const post = schedule.posts[postIndex]
-        const enabledPlatform = post.platforms?.find(p => p.enabled)
-        platform = enabledPlatform?.platform || 'Instagram'
-        platform = platform.charAt(0).toUpperCase() + platform.slice(1)
-      }
-    }
-    
-    // If we have an updated post from PostDetailModal, we could save it here
-    if (updatedPost) {
-      console.log('📝 Updated post with images:', updatedPost.content?.images)
-    }
-    
+
+    const platform = typeof platformOrIndex === 'string'
+      ? platformOrIndex.charAt(0).toUpperCase() + platformOrIndex.slice(1)
+      : 'Instagram'
+
+    // Show loading popup while the real request runs
     setResultPlatform(platform)
-    
-    // Show loading
     setResultStatus('loading')
     setShowResult(true)
-    
-    // Simulate API call (2 seconds)
-    setTimeout(() => {
-      // 90% success rate for demo
-      const isSuccess = Math.random() < 0.9
-      console.log('📊 Simulated publish result:', isSuccess ? 'SUCCESS' : 'ERROR')
-      
-      if (isSuccess) {
-        setResultStatus('success')
-        // Add notification for successful publication
-        addNotification(NOTIFICATION_TYPES.POST_PUBLISHED, {
-          platform: platform
-        })
-      } else {
-        setResultStatus('error')
-        // Add notification for publication error
-        addNotification(NOTIFICATION_TYPES.POST_ERROR, {
-          platform: platform
-        })
+
+    try {
+      const response = await api.post(`/schedule/${schedule.id}/publish/${postIndex}`, {
+        imageUrl,
+        postId: post.id
+      })
+
+      if (!response.ok) {
+        let errorMessage = 'Error al publicar'
+        try {
+          const errData = await response.json()
+          errorMessage = errData.error || errorMessage
+        } catch (e) { /* ignore parse errors */ }
+        throw new Error(errorMessage)
       }
-    }, 2000)
+
+      const result = await response.json()
+      const updatedPosts = [...schedule.posts]
+      updatedPosts[postIndex] = result.post
+      setSchedule({ ...schedule, posts: updatedPosts })
+      setResultStatus('success')
+      addNotification(NOTIFICATION_TYPES.POST_PUBLISHED, { platform })
+    } catch (err) {
+      console.error('Error publishing:', err)
+      setResultStatus('error')
+      setError(err.message)
+      addNotification(NOTIFICATION_TYPES.POST_ERROR, { platform })
+    }
   }
 
   const regenerateCopies = async (platform) => {
     if (!selectedProperty) return
     setIsGenerating(true)
     try {
-      const response = await fetch(`${API_URL}/content/generate/platform/${platform}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ property: selectedProperty })
-      })
+      const response = await api.post(`/content/generate/platform/${platform}`, { property: selectedProperty })
       if (response.ok) {
         const result = await response.json()
         setContent(prev => {
@@ -829,7 +752,7 @@ case 'properties':
                 <ScheduleTimeline 
                   schedule={schedule || { posts: [] }} 
                   property={selectedProperty}
-                  onPublish={handleSimulatedPublish}
+                  onPublish={handlePublish}
                   onNewSchedule={() => setShowScheduleModal(true)}
                 />
               )}
@@ -849,7 +772,7 @@ case 'properties':
         return <InboxPage />
 
       case 'agents':
-        return <AgentsPage onNavigate={handleNavigate} />
+        return <AgentsPage onNavigate={handleNavigate} user={user} />
 
       case 'automation':
         return <AutomationPage />
@@ -969,6 +892,9 @@ case 'properties':
           onClose={() => setShowScheduleSuccess(false)}
           data={scheduleSuccessData}
         />
+
+        {/* Sonner toasts (used by AgentsPage and other pages) */}
+        <Toaster richColors position="top-right" />
       </div>
   )
 }

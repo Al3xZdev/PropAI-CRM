@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Search, Upload, FileText, Download, Trash2, X, Share2, Eye, Folder, FolderPlus, LayoutGrid, List, Clock, AlertCircle, FileCheck, File, FileSignature, ChevronRight, ChevronDown, MoreVertical, Move } from 'lucide-react'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
+import { api } from '../utils/api'
 
 const DOC_TYPES = [
   { value: 'contract_buy', label: 'Contrato de Compra-Venta' },
@@ -75,8 +74,6 @@ export default function DocumentsPage() {
   const [isDragging, setIsDragging] = useState(false)
 
   const fileInputRef = useRef(null)
-  const token = localStorage.getItem('accessToken')
-  const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
 
   const stats = {
     total: documents.length,
@@ -90,12 +87,11 @@ export default function DocumentsPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const authHeaders = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
       
       const [docsRes, leadsRes, foldersRes] = await Promise.all([
-        fetch(API_URL + '/documents', { headers: authHeaders }),
-        fetch(API_URL + '/leads?limit=1000', { headers: authHeaders }),
-        fetch(API_URL + '/folders', { headers: authHeaders })
+        api.get('/documents'),
+        api.get('/leads?limit=1000'),
+        api.get('/folders')
       ])
       
       if (docsRes.ok) {
@@ -181,11 +177,7 @@ export default function DocumentsPage() {
   const createFolder = async () => {
     if (!newFolderName.trim()) return showToast('El nombre es obligatorio', 'error')
     try {
-      const res = await fetch(API_URL + '/folders', {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newFolderName.trim(), parentId: currentFolderId })
-      })
+      const res = await api.post('/folders', { name: newFolderName.trim(), parentId: currentFolderId })
       if (!res.ok) throw new Error('Error al crear carpeta')
       const folder = await res.json()
       setFolders(prev => [...prev, folder])
@@ -198,7 +190,7 @@ export default function DocumentsPage() {
   // === ELIMINAR CARPETA ===
   const deleteFolder = async (folderId) => {
     try {
-      await fetch(API_URL + '/folders/' + folderId, { method: 'DELETE', headers })
+      await api.delete('/folders/' + folderId)
       setFolders(prev => prev.filter(f => f.id !== folderId))
       // Los documentos quedan con folderId: null
       setDocuments(prev => prev.map(d => d.folderId === folderId ? { ...d, folderId: null, folder: null } : d))
@@ -212,11 +204,7 @@ export default function DocumentsPage() {
   // === MOVER DOCUMENTO ===
   const moveDocument = async (targetFolderId) => {
     try {
-      const res = await fetch(API_URL + '/documents/' + docToMove.id, {
-        method: 'PUT',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderId: targetFolderId })
-      })
+      const res = await api.put('/documents/' + docToMove.id, { folderId: targetFolderId })
       if (!res.ok) throw new Error('Error al mover documento')
       const updated = await res.json()
       setDocuments(prev => prev.map(d => d.id === docToMove.id ? updated : d))
@@ -256,7 +244,7 @@ export default function DocumentsPage() {
       formData.append('folderId', currentFolderId || '') // Asignar a carpeta actual
       formData.append('status', 'draft')
 
-      const res = await fetch(API_URL + '/documents', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData })
+      const res = await api.upload('/documents', formData)
       if (!res.ok) throw new Error('Error al subir')
       const newDoc = await res.json()
       setDocuments(prev => [newDoc, ...prev])
@@ -271,7 +259,7 @@ export default function DocumentsPage() {
   const openDeleteModal = (doc) => { setDocToDelete(doc); setShowDeleteModal(true) }
   const confirmDelete = async () => {
     try {
-      const res = await fetch(API_URL + '/documents/' + docToDelete.id, { method: 'DELETE', headers })
+      const res = await api.delete('/documents/' + docToDelete.id)
       if (!res.ok) throw new Error('Error al eliminar')
       setDocuments(prev => prev.filter(d => d.id !== docToDelete.id))
       if (selectedDoc?.id === docToDelete.id) { setShowDetailModal(false); setSelectedDoc(null) }
@@ -282,7 +270,7 @@ export default function DocumentsPage() {
 
   const handleStatusChange = async (docId, newStatus) => {
     try {
-      const res = await fetch(API_URL + '/documents/' + docId, { method: 'PUT', headers, body: JSON.stringify({ status: newStatus }) })
+      const res = await api.put('/documents/' + docId, { status: newStatus })
       if (!res.ok) throw new Error('Error al actualizar')
       const updated = await res.json()
       setDocuments(prev => prev.map(d => d.id === docId ? updated : d))
@@ -655,7 +643,13 @@ export default function DocumentsPage() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 border border-slate-600 w-full max-w-4xl h-[80vh] rounded-2xl flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-slate-700"><h2 className="text-xl font-bold text-white">{selectedDoc.name}</h2><button onClick={() => setShowPreviewModal(false)} className="text-slate-400"><X className="w-6 h-6" /></button></div>
-            <div className="flex-1 bg-slate-800">{selectedDoc.url ? <iframe src={'https://docs.google.com/viewer?url='+encodeURIComponent(selectedDoc.url)+'&embedded=true'} className="w-full h-full" /> : <div className="flex items-center justify-center h-full text-slate-400">Sin vista previa</div>}</div>
+            <div className="flex-1 bg-slate-800">{selectedDoc.url ? (
+              selectedDoc.mimeType && selectedDoc.mimeType.startsWith('image/') ? (
+                <img src={selectedDoc.url} alt={selectedDoc.name || 'Documento'} className="w-full h-full object-contain" />
+              ) : (
+                <iframe src={'https://docs.google.com/viewer?url='+encodeURIComponent(selectedDoc.url)+'&embedded=true'} className="w-full h-full" title={selectedDoc.name || 'Vista previa'} />
+              )
+            ) : <div className="flex items-center justify-center h-full text-slate-400">Sin vista previa</div>}</div>
           </div>
         </div>
       )}

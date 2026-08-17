@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { 
   LayoutDashboard, Building2, Users, 
   Zap, History, ChevronRight, Home,
-  LogOut, User, X
+  LogOut, User, X, Folder, UserCog
 } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 
@@ -13,7 +13,9 @@ const Sidebar = ({ currentPage, onNavigate, stats, user, onLogout }) => {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'properties', label: 'Propiedades', icon: Building2 },
     { id: 'leads', label: 'Leads', icon: Users },
-    { id: 'automation', label: 'Automation', icon: Zap },
+    { id: 'automation', label: 'Automatización', icon: Zap },
+    { id: 'documents', label: 'Documentos', icon: Folder },
+    { id: 'agents', label: 'Agentes', icon: UserCog },
     { id: 'history', label: 'Historial', icon: History }
   ]
 
