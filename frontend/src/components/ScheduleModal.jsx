@@ -4,13 +4,7 @@ import {
   X, ChevronLeft, ChevronRight, Check, AlertCircle, Image, Square,
   Minus, ArrowUp, ArrowDown, Plus
 } from 'lucide-react'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-  'Content-Type': 'application/json'
-})
+import { api } from '../utils/api'
 
 const TIME_GROUPS = [
   { id: 'madrugada', label: 'Madrugada', icon: '🌙', range: [0, 6] },
@@ -226,11 +220,7 @@ export default function ScheduleModal({ isOpen, onClose, onScheduled, property =
         propertyId: property?.id || null,
         status: 'scheduled'
       }
-      const response = await fetch(`${API_URL}/schedule/manual`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(postData)
-      })
+      const response = await api.post('/schedule/manual', postData)
       if (!response.ok) throw new Error('Error al guardar')
       const result = await response.json()
       onClose()

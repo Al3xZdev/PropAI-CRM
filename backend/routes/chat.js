@@ -4,6 +4,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../services/db');
 const { optionalAuth, tenantFilter } = require('../middleware/auth');
+const { normalizePhone } = require('../utils/validation');
 const multer = require('multer');
 
 // Import Messenger and Instagram services for sending messages
@@ -52,6 +53,51 @@ async function getTenantId() {
   if (cachedTenantId) return cachedTenantId;
   cachedTenantId = await getDefaultTenantId();
   return cachedTenantId;
+}
+
+/**
+ * Create a chat_message notification for an incoming message.
+ * Recipient: lead.assignedTo if set, otherwise all active admins of the tenant.
+ * Never throws — notification errors must not break the webhook response.
+ */
+async function createChatNotification({ lead, content, channel, channelLabel, fromName }) {
+  try {
+    const recipients = [];
+    if (lead.assignedTo) {
+      recipients.push(lead.assignedTo);
+    } else {
+      const admins = await prisma.user.findMany({
+        where: { tenantId: lead.tenantId, role: 'admin', isActive: true },
+        select: { id: true }
+      });
+      for (const admin of admins) recipients.push(admin.id);
+    }
+
+    if (recipients.length === 0) {
+      console.log(`[chat] Sin destinatarios para notificación de ${channel}`);
+      return;
+    }
+
+    const shortContent = (content || '[Mensaje]').substring(0, 120);
+    const description = `Nuevo mensaje de ${lead.name || fromName || 'Lead'}: ${shortContent}`;
+
+    for (const userId of recipients) {
+      await prisma.notification.create({
+        data: {
+          tenantId: lead.tenantId,
+          userId,
+          type: 'chat_message',
+          title: `Nuevo mensaje de ${channelLabel}`,
+          description,
+          leadId: lead.id,
+          channel
+        }
+      });
+    }
+    console.log(`🔔 Notificación de ${channel} creada (${recipients.length} destinatario(s))`);
+  } catch (err) {
+    console.error(`❌ Error creando notificación de ${channel}:`, err.message);
+  }
 }
 
 // ==================== CONVERSATIONS ====================
@@ -654,7 +700,10 @@ const entry = req.body.entry?.[0];
     }
 
     const { from, id, timestamp, text, image, interactive } = messageData;
-    const phone = from;
+    // WhatsApp Cloud API sends E.164 WITHOUT the leading '+' (e.g. '5215512345678').
+    // Normalize to canonical E.164 so manual leads created with '+52...' match this
+    // webhook instead of creating duplicates.
+    const phone = /^\d+$/.test(from) ? normalizePhone(`+${from}`) : normalizePhone(from);
     const channel = 'whatsapp';
     
     console.log(`📱 Message from ${phone}: ${text?.body || '[media]'}`);
@@ -716,6 +765,15 @@ const content = text?.body || (image ? '[Imagen]' : '[Mensaje interactivo]');
     await prisma.lead.update({
       where: { id: lead.id },
       data: { lastContact: new Date() }
+    });
+    
+    // Create notification for the incoming message (must not break the webhook)
+    await createChatNotification({
+      lead,
+      content,
+      channel,
+      channelLabel: 'WhatsApp',
+      fromName: from
     });
     
     res.status(200).send('OK');
@@ -816,27 +874,13 @@ const savedMessage = await prisma.message.create({
       data: { lastContact: new Date() }
     });
     
-    // Create notification for new message
-try {
-      await prisma.notification.create({
-        data: {
-          tenantId: lead.tenantId,
-          type: 'chat_message',
-          title: `Nuevo mensaje de ${lead.name}`,
-          message: (message?.text || '[Mensaje]').substring(0, 100),
-          data: {
-            leadId: lead.id,
-            leadName: lead.name,
-            conversationId: conversation.id,
-            channel: 'instagram',
-            messageId: savedMessage.id
-          }
-        }
-      });
-      console.log('🔔 Instagram notification created');
-    } catch (notifError) {
-      console.error('Error creating notification:', notifError.message);
-    }
+    // Create notification for new message (must not break the webhook)
+    await createChatNotification({
+      lead,
+      content: message?.text || '[Mensaje]',
+      channel: 'instagram',
+      channelLabel: 'Instagram'
+    });
     
     res.status(200).send('OK');
   } catch (err) {
@@ -1027,27 +1071,13 @@ const content = msgData?.text || msgData?.content || '[Mensaje]';
       data: { lastContact: new Date() }
     });
     
-    // Create notification for new message
-try {
-      await prisma.notification.create({
-        data: {
-          tenantId: lead.tenantId,
-          type: 'chat_message',
-          title: `Nuevo mensaje de ${lead.name}`,
-          message: content.substring(0, 100),
-          data: {
-            leadId: lead.id,
-            leadName: lead.name,
-            conversationId: conversation.id,
-            channel: 'messenger',
-            messageId: savedMessage.id
-          }
-        }
-      });
-      console.log('🔔 Notification created');
-    } catch (notifError) {
-      console.error('Error creating notification:', notifError.message);
-    }
+    // Create notification for new message (must not break the webhook)
+    await createChatNotification({
+      lead,
+      content,
+      channel,
+      channelLabel: 'Messenger'
+    });
     
     console.log(`✅ Message saved for lead ${lead.id}`);
   } catch (err) {
@@ -1126,27 +1156,13 @@ const savedMessage = await prisma.message.create({
       data: { lastContact: new Date() }
     });
     
-    // Create notification for new message
-try {
-      await prisma.notification.create({
-        data: {
-          tenantId: lead.tenantId,
-          type: 'chat_message',
-          title: `Nuevo mensaje de ${lead.name}`,
-          message: (message?.text || '[Mensaje]').substring(0, 100),
-          data: {
-            leadId: lead.id,
-            leadName: lead.name,
-            conversationId: conversation.id,
-            channel: 'messenger',
-            messageId: savedMessage.id
-          }
-        }
-      });
-      console.log('🔔 Notification created for', lead.name);
-    } catch (notifError) {
-      console.error('Error creating notification:', notifError.message);
-    }
+    // Create notification for new message (must not break the webhook)
+    await createChatNotification({
+      lead,
+      content: message?.text || '[Mensaje]',
+      channel,
+      channelLabel: 'Messenger'
+    });
   } catch (err) {
     console.error('Error processing Facebook messaging:', err);
   }

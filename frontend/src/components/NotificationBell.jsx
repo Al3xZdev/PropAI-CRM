@@ -100,12 +100,13 @@ const NotificationBell = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          relative p-3 rounded-xl transition-all duration-300
+          relative w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300
           ${isOpen ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
           ${isAnimating ? 'animate-wiggle' : ''}
         `}
       >
         <Bell className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-12' : ''}`} />
+        <span className="font-medium">Notificaciones</span>
         
         {/* Badge */}
         {unreadCount > 0 && (
@@ -124,13 +125,13 @@ const NotificationBell = () => {
       {/* Notification Panel */}
       {isOpen && (
         <div className="
-          absolute right-0 top-full mt-2
+          absolute left-full top-0 ml-2
           w-96 max-h-[500px]
           bg-slate-800 rounded-2xl 
           border border-slate-700
           shadow-2xl shadow-black/50
           overflow-hidden
-          animate-scale-in origin-top-right
+          animate-scale-in origin-top-left
           z-50
         ">
           {/* Header */}

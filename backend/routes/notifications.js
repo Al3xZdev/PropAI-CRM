@@ -9,12 +9,12 @@ router.use(requireAuth);
 
 /**
  * GET /api/notifications
- * Get all notifications for the current user/tenant
+ * Get all notifications for the current user (and tenant)
  */
 router.get('/', async (req, res) => {
   try {
     const notifications = await prisma.notification.findMany({
-      where: { tenantId: req.tenantId },
+      where: { tenantId: req.tenantId, userId: req.userId },
       orderBy: { createdAt: 'desc' },
       take: 100
     });
@@ -22,6 +22,7 @@ router.get('/', async (req, res) => {
     const unreadCount = await prisma.notification.count({
       where: { 
         tenantId: req.tenantId,
+        userId: req.userId,
         read: false
       }
     });
@@ -45,6 +46,7 @@ router.get('/unread-count', async (req, res) => {
     const count = await prisma.notification.count({
       where: { 
         tenantId: req.tenantId,
+        userId: req.userId,
         read: false
       }
     });
@@ -63,11 +65,12 @@ router.put('/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Verify notification belongs to tenant
+    // Verify notification belongs to tenant and user
     const existing = await prisma.notification.findFirst({
       where: { 
         id,
-        tenantId: req.tenantId
+        tenantId: req.tenantId,
+        userId: req.userId
       }
     });
     
@@ -96,6 +99,7 @@ router.put('/read-all', async (req, res) => {
     await prisma.notification.updateMany({
       where: { 
         tenantId: req.tenantId,
+        userId: req.userId,
         read: false
       },
       data: { read: true }
@@ -104,6 +108,24 @@ router.put('/read-all', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Error marking all as read:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/notifications/clear-all
+ * Delete all notifications for the current user (and tenant)
+ * NOTE: defined before /:id so the route is not captured as an id
+ */
+router.delete('/clear-all', async (req, res) => {
+  try {
+    await prisma.notification.deleteMany({
+      where: { tenantId: req.tenantId, userId: req.userId }
+    });
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error clearing all notifications:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -119,7 +141,8 @@ router.delete('/:id', async (req, res) => {
     const existing = await prisma.notification.findFirst({
       where: { 
         id,
-        tenantId: req.tenantId
+        tenantId: req.tenantId,
+        userId: req.userId
       }
     });
     
@@ -166,23 +189,6 @@ router.post('/', async (req, res) => {
     res.status(201).json({ success: true, notification });
   } catch (err) {
     console.error('Error creating notification:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
- * DELETE /api/notifications/clear-all
- * Delete all notifications for the current tenant
- */
-router.delete('/clear-all', async (req, res) => {
-  try {
-    await prisma.notification.deleteMany({
-      where: { tenantId: req.tenantId }
-    });
-    
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Error clearing all notifications:', err);
     res.status(500).json({ error: err.message });
   }
 });

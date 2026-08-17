@@ -6,13 +6,7 @@ import {
   File, Video, ImageIcon, XCircle, Upload, Trash2,
   AlertTriangle
 } from 'lucide-react'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-  'Content-Type': 'application/json'
-})
+import { api } from '../utils/api'
 
 // Channel configuration
 const CHANNEL_CONFIG = {
@@ -126,9 +120,7 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
     
     setIsSyncing(true)
     try {
-      const response = await fetch(`${API_URL}/chat/conversations/${conversation.id}/messages`, {
-        headers: getAuthHeaders()
-      })
+      const response = await api.get(`/chat/conversations/${conversation.id}/messages`)
       
       if (response.ok) {
         const data = await response.json()
@@ -150,9 +142,7 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
     setLoading(true)
     try {
       // Use selected channel to get/create conversation
-      const convResponse = await fetch(`${API_URL}/chat/conversations/lead/${lead.id}?channel=${selectedChannel}`, {
-        headers: getAuthHeaders()
-      })
+      const convResponse = await api.get(`/chat/conversations/lead/${lead.id}?channel=${selectedChannel}`)
       
       let conv
       if (convResponse.ok) {
@@ -162,13 +152,9 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
 
       // If no conversation, try to create one with selected channel
       if (!conv) {
-        const createResponse = await fetch(`${API_URL}/chat/conversations`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ 
-            leadId: lead.id, 
-            channel: selectedChannel
-          })
+        const createResponse = await api.post('/chat/conversations', { 
+          leadId: lead.id, 
+          channel: selectedChannel
         })
 
         if (createResponse.ok) {
@@ -181,9 +167,7 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
 
       // Get messages - filter by channel
       if (conv) {
-        const messagesResponse = await fetch(`${API_URL}/chat/conversations/${conv.id}/messages`, {
-          headers: getAuthHeaders()
-        })
+        const messagesResponse = await api.get(`/chat/conversations/${conv.id}/messages`)
         
         if (messagesResponse.ok) {
           const messagesData = await messagesResponse.json()
@@ -218,14 +202,10 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
         ? selectedChannel 
         : (followUps[0]?.channel || selectedChannel)
       
-      const response = await fetch(`${API_URL}/chat/migrate/followups`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          leadId: lead.id,
-          followUps,
-          channel: channelToUse
-        })
+      const response = await api.post('/chat/migrate/followups', {
+        leadId: lead.id,
+        followUps,
+        channel: channelToUse
       })
 
       if (response.ok) {
@@ -234,9 +214,7 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
         
         // Reload messages filtered by channel
         if (data.conversation) {
-          const messagesResponse = await fetch(`${API_URL}/chat/conversations/${data.conversation.id}/messages`, {
-            headers: getAuthHeaders()
-          })
+          const messagesResponse = await api.get(`/chat/conversations/${data.conversation.id}/messages`)
           
           if (messagesResponse.ok) {
             const messagesData = await messagesResponse.json()
@@ -318,13 +296,7 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch(`${API_URL}/chat/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
-        },
-        body: formData
-      })
+      const response = await api.upload('/chat/upload', formData)
 
       if (!response.ok) {
         throw new Error('Failed to upload file')
@@ -370,16 +342,12 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
           }
 
           try {
-            const whatsappResponse = await fetch(`${API_URL}/chat/send/whatsapp/media`, {
-              method: 'POST',
-              headers: getAuthHeaders(),
-              body: JSON.stringify({
-                phoneNumber: lead.phone,
-                mediaUrl: item.uploadData.url,
-                mediaType: messageType,
-                caption: item.file.name,
-                leadId: lead.id
-              })
+            const whatsappResponse = await api.post('/chat/send/whatsapp/media', {
+              phoneNumber: lead.phone,
+              mediaUrl: item.uploadData.url,
+              mediaType: messageType,
+              caption: item.file.name,
+              leadId: lead.id
             })
 
             if (whatsappResponse.ok) {
@@ -406,17 +374,13 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
         // Fallback: save locally
         for (const item of uploadedFiles) {
           const mimeType = item.file.type
-          const response = await fetch(`${API_URL}/chat/messages/to-lead`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-              leadId: lead.id,
-              channel: selectedChannel,
-              content: item.file.name,
-              type: mimeType.startsWith('video/') ? 'video' : (mimeType === 'application/pdf' ? 'document' : 'image'),
-              mediaUrl: item.uploadData.url,
-              fileName: item.file.name
-            })
+          const response = await api.post('/chat/messages/to-lead', {
+            leadId: lead.id,
+            channel: selectedChannel,
+            content: item.file.name,
+            type: mimeType.startsWith('video/') ? 'video' : (mimeType === 'application/pdf' ? 'document' : 'image'),
+            mediaUrl: item.uploadData.url,
+            fileName: item.file.name
           })
 
           if (response.ok) {
@@ -456,16 +420,12 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
         }
 
         try {
-          const whatsappResponse = await fetch(`${API_URL}/chat/send/whatsapp/media`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-              phoneNumber: lead.phone,
-              mediaUrl: uploadData.url,
-              mediaType: messageType,
-              caption: caption || file.name,
-              leadId: lead.id
-            })
+          const whatsappResponse = await api.post('/chat/send/whatsapp/media', {
+            phoneNumber: lead.phone,
+            mediaUrl: uploadData.url,
+            mediaType: messageType,
+            caption: caption || file.name,
+            leadId: lead.id
           })
 
           if (whatsappResponse.ok) {
@@ -496,17 +456,13 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
       if (!fileSent) {
         const uploadData = await uploadFile(file)
         
-        const response = await fetch(`${API_URL}/chat/messages/to-lead`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            leadId: lead.id,
-            channel: selectedChannel,
-            content: caption || file.name,
-            type: file.type.startsWith('video/') ? 'video' : (file.type === 'application/pdf' ? 'document' : 'image'),
-            mediaUrl: uploadData.url,
-            fileName: file.name
-          })
+        const response = await api.post('/chat/messages/to-lead', {
+          leadId: lead.id,
+          channel: selectedChannel,
+          content: caption || file.name,
+          type: file.type.startsWith('video/') ? 'video' : (file.type === 'application/pdf' ? 'document' : 'image'),
+          mediaUrl: uploadData.url,
+          fileName: file.name
         })
 
         if (response.ok) {
@@ -542,14 +498,10 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
       // If channel is WhatsApp, try to send via WhatsApp API
       if (selectedChannel === 'whatsapp' && lead?.phone) {
         try {
-          const whatsappResponse = await fetch(`${API_URL}/chat/send/whatsapp`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({
-              phoneNumber: lead.phone,
-              message: newMessage.trim(),
-              leadId: lead.id
-            })
+          const whatsappResponse = await api.post('/chat/send/whatsapp', {
+            phoneNumber: lead.phone,
+            message: newMessage.trim(),
+            leadId: lead.id
           })
           
           if (whatsappResponse.ok) {
@@ -579,15 +531,11 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
       
       // Fallback: save locally if WhatsApp didn't work or wasn't selected
       if (!messageSent) {
-        const response = await fetch(`${API_URL}/chat/messages/to-lead`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            leadId: lead.id,
-            channel: selectedChannel,
-            content: newMessage.trim(),
-            type: 'text'
-          })
+        const response = await api.post('/chat/messages/to-lead', {
+          leadId: lead.id,
+          channel: selectedChannel,
+          content: newMessage.trim(),
+          type: 'text'
         })
 
         if (response.ok) {
@@ -623,10 +571,7 @@ export default function ChatModal({ isOpen, onClose, lead, onMessageSent }) {
     if (!conversation) return
     
     try {
-      const response = await fetch(`${API_URL}/chat/conversations/${conversation.id}/messages`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      })
+      const response = await api.delete(`/chat/conversations/${conversation.id}/messages`)
       
       if (response.ok) {
         setMessages([])
