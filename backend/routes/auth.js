@@ -12,6 +12,7 @@ const {
   extractToken 
 } = require('../services/authService');
 const { logAuthEvent } = require('../middleware/auditLogger');
+const { normalizePhone } = require('../utils/validation');
 
 // Cookie options - diferente para dev vs production
 const isProduction = process.env.NODE_ENV === 'production';
@@ -270,7 +271,7 @@ router.post('/admin/create-user', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Solo administradores pueden crear usuarios' });
     }
     
-    const { email, password, name, role } = req.body;
+    const { email, password, name, role, phone } = req.body;
     
     if (!email || !password || !name) {
       return res.status(400).json({ error: 'Email, contraseña y nombre son requeridos' });
@@ -301,7 +302,8 @@ router.post('/admin/create-user', requireAuth, async (req, res) => {
         email: email.toLowerCase(),
         passwordHash,
         name,
-        role: role || 'agent'
+        role: role || 'agent',
+        phone: phone ? normalizePhone(phone) : null
       }
     });
     
@@ -311,7 +313,8 @@ router.post('/admin/create-user', requireAuth, async (req, res) => {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
-        role: newUser.role
+        role: newUser.role,
+        phone: newUser.phone
       },
       message: `Usuario creado exitosamente. Credenciales: ${email} / ${password}`
     });
@@ -367,7 +370,7 @@ router.put('/admin/users/:id', requireAuth, async (req, res) => {
     }
     
     const { id } = req.params;
-    const { name, role, isActive } = req.body;
+    const { name, role, isActive, phone } = req.body;
     
     // Verificar que el usuario pertenezca al mismo tenant
     const userToUpdate = await prisma.user.findFirst({
@@ -383,14 +386,16 @@ router.put('/admin/users/:id', requireAuth, async (req, res) => {
       data: {
         ...(name && { name }),
         ...(role && { role }),
-        ...(isActive !== undefined && { isActive })
+        ...(isActive !== undefined && { isActive }),
+        ...(phone !== undefined && { phone: phone ? normalizePhone(phone) : null })
       },
       select: {
         id: true,
         email: true,
         name: true,
         role: true,
-        isActive: true
+        isActive: true,
+        phone: true
       }
     });
     

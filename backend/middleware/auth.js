@@ -140,6 +140,15 @@ function requireTenant(req, res, next) {
   next();
 }
 
+/**
+ * Prisma where-clause filter for tenant isolation.
+ * Returns { tenantId } when the request is authenticated; {} otherwise
+ * (e.g. webhooks without auth must not break).
+ */
+function tenantFilter(req) {
+  return req.tenantId ? { tenantId: req.tenantId } : {};
+}
+
 module.exports = {
   extractToken,
   verifyToken,
@@ -147,5 +156,6 @@ module.exports = {
   optionalAuth,
   requireRole,
   requireTenant,
+  tenantFilter,
   JWT_SECRET
 };

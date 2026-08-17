@@ -1,5 +1,6 @@
 // Input Validation & Sanitization Utilities
 const crypto = require('crypto');
+const { parsePhoneNumber } = require('libphonenumber-js');
 
 /**
  * Sanitize string input - remove potentially dangerous characters
@@ -26,13 +27,52 @@ function sanitizeEmail(email) {
 }
 
 /**
+ * Normalize phone number to E.164 (with leading +).
+ * Lenient: parses with libphonenumber-js (defaulting to the given country when
+ * no country code is detectable); falls back to light sanitization when the
+ * input cannot be parsed or is invalid. Never throws.
+ */
+function normalizePhone(raw, defaultCountry = 'AR') {
+  if (!raw || typeof raw !== 'string') return '';
+
+  const input = raw.trim();
+  if (!input) return '';
+
+  const tryParse = (value) => {
+    try {
+      const parsed = parsePhoneNumber(value, defaultCountry);
+      if (parsed && parsed.isValid()) return parsed.format('E.164');
+      // Some numbers carry a legacy carrier '1' prefix (e.g. Mexican mobiles
+      // written as +52155...) that current metadata no longer accepts as-is.
+      if (parsed && parsed.countryCallingCode && /^1/.test(parsed.nationalNumber)) {
+        const retry = parsePhoneNumber(`+${parsed.countryCallingCode}${parsed.nationalNumber.slice(1)}`, defaultCountry);
+        if (retry && retry.isValid()) return retry.format('E.164');
+      }
+    } catch (err) {
+      // Unparseable input; fall through to light sanitization.
+    }
+    return null;
+  };
+
+  const result = tryParse(input);
+  if (result) return result;
+
+  // Digits-only E.164 without the leading '+' (e.g. WhatsApp webhook payloads):
+  // interpret it as an international number.
+  if (/^\d+$/.test(input)) {
+    const asE164 = tryParse(`+${input}`);
+    if (asE164) return asE164;
+  }
+
+  // Fallback: keep only digits, +, -, spaces
+  return input.replace(/[^\d+\-\s]/g, '').trim().slice(0, 20);
+}
+
+/**
  * Sanitize phone number
  */
 function sanitizePhone(phone) {
-  if (!phone || typeof phone !== 'string') return '';
-  
-  // Keep only digits, +, -, spaces
-return phone.replace(/[^\d+\-\s]/g, '').trim().slice(0, 20);
+  return normalizePhone(phone);
 }
 
 /**
@@ -197,6 +237,7 @@ module.exports = {
   sanitizeString,
   sanitizeEmail,
   sanitizePhone,
+  normalizePhone,
   isValidUUID,
   isValidEmail,
   validateRequired,
