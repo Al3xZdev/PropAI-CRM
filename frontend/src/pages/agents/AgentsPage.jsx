@@ -323,6 +323,9 @@ const AgentsPage = ({ onNavigate, user }) => {
   const [commissionsMonth, setCommissionsMonth] = useState(() => {
     const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })
+  const [showPayModal, setShowPayModal] = useState(null) // commission object or null
+  const [payingCommission, setPayingCommission] = useState(false)
+  const [paySuccess, setPaySuccess] = useState(null)
   
   // Create user form
   const [newUser, setNewUser] = useState({
@@ -450,6 +453,27 @@ const AgentsPage = ({ onNavigate, user }) => {
       console.error('Error loading agent commissions:', err)
     } finally {
       setCommissionsLoading(false)
+    }
+  }
+
+  const handlePayCommission = async (commissionId) => {
+    setPayingCommission(true)
+    try {
+      const res = await api.put(`/commissions/${commissionId}`, { status: 'paid' })
+      if (res.ok) {
+        setPaySuccess('Comisión marcada como pagada')
+        setShowPayModal(null)
+        fetchAgentCommissions(selectedAgent.id, commissionsMonth)
+      } else {
+        const err = await res.json()
+        setPaySuccess(null)
+        console.error('Error paying commission:', err.error)
+      }
+    } catch (err) {
+      console.error('Error paying commission:', err)
+    } finally {
+      setPayingCommission(false)
+      setTimeout(() => setPaySuccess(null), 3000)
     }
   }
 
@@ -891,7 +915,7 @@ const AgentsPage = ({ onNavigate, user }) => {
                         <FunnelChart pipeline={ag.pipeline || {}} color={ag.color} colors={colors} />
                         
                         <div className="grid grid-cols-5 gap-2 mt-4">
-                          {Object.entries(ag.pipeline || {}).map(([s, v]) => {
+                          {Object.entries(ag.pipeline || {}).filter(([s]) => stageConfig[s]).map(([s, v]) => {
                             const cfg = stageConfig[s]
                             const total = Object.values(ag.pipeline || {}).reduce((a, b) => a + b, 0)
                             return (
@@ -987,6 +1011,14 @@ const AgentsPage = ({ onNavigate, user }) => {
                           </div>
                         </div>
 
+                        {/* Success message */}
+                        {paySuccess && (
+                          <div className="mb-4 p-3 rounded-xl text-sm flex items-center gap-2 bg-emerald-500/20 text-emerald-200 border border-emerald-500/30">
+                            <Check className="w-4 h-4" />
+                            {paySuccess}
+                          </div>
+                        )}
+
                         {commissionsLoading ? (
                           <div className="flex items-center justify-center py-12">
                             <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
@@ -999,7 +1031,7 @@ const AgentsPage = ({ onNavigate, user }) => {
                         ) : (
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                              <thead>
+                                  <thead>
                                 <tr className="border-b border-slate-800">
                                   <th className="text-left py-2 px-3 font-medium text-slate-500">Lead</th>
                                   <th className="text-right py-2 px-3 font-medium text-slate-500">Monto</th>
@@ -1007,6 +1039,7 @@ const AgentsPage = ({ onNavigate, user }) => {
                                   <th className="text-right py-2 px-3 font-medium text-slate-500">Comisión</th>
                                   <th className="text-center py-2 px-3 font-medium text-slate-500">Estado</th>
                                   <th className="text-right py-2 px-3 font-medium text-slate-500">Fecha</th>
+                                  {user?.role === 'admin' || user?.role === 'manager' ? <th className="text-center py-2 px-3 font-medium text-slate-500">Acción</th> : null}
                                 </tr>
                               </thead>
                               <tbody>
@@ -1029,6 +1062,18 @@ const AgentsPage = ({ onNavigate, user }) => {
                                     <td className="py-2.5 px-3 text-right text-xs text-slate-500">
                                       {new Date(c.createdAt).toLocaleDateString('es-AR')}
                                     </td>
+                                    {user?.role === 'admin' || user?.role === 'manager' ? (
+                                      <td className="py-2.5 px-3 text-center">
+                                        {c.status === 'pending' && (
+                                          <button
+                                            onClick={() => setShowPayModal(c)}
+                                            className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs font-medium transition-colors"
+                                          >
+                                            Marcar pagada
+                                          </button>
+                                        )}
+                                      </td>
+                                    ) : null}
                                   </tr>
                                 ))}
                               </tbody>
@@ -1668,6 +1713,54 @@ const AgentsPage = ({ onNavigate, user }) => {
               >
                 {deleting ? 'Eliminando...' : 'Eliminar Agente'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pay Commission Confirmation Modal */}
+      {showPayModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowPayModal(null)}>
+          <div className="rounded-2xl w-full max-w-md border shadow-2xl animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}
+            style={{ backgroundColor: '#0f1520', borderColor: '#10b981' }}>
+            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: colors.border }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold" style={{ color: colors.foreground }}>Marcar como pagada</h2>
+                  <p className="text-xs" style={{ color: colors.muted }}>Confirmar pago de comisión</p>
+                </div>
+              </div>
+              <button onClick={() => setShowPayModal(null)} style={{ color: colors.muted }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm" style={{ color: colors.foreground }}>
+                ¿Confirmás que la comisión de <span className="text-emerald-400 font-semibold">${Number(showPayModal.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span> fue pagada a <span className="font-semibold">{selectedAgent?.name}</span>?
+              </p>
+              <p className="text-xs" style={{ color: colors.muted }}>
+                Lead: {showPayModal.leadName || '—'} · {new Date(showPayModal.createdAt).toLocaleDateString('es-AR')}
+              </p>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowPayModal(null)}
+                  disabled={payingCommission}
+                  className="flex-1 py-3 rounded-xl font-medium transition-colors"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: colors.foreground, border: `1px solid ${colors.border}` }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handlePayCommission(showPayModal.id)}
+                  disabled={payingCommission}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-xl font-medium text-white transition-colors"
+                >
+                  {payingCommission ? 'Procesando...' : 'Confirmar pago'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
