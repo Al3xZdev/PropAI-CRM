@@ -22,6 +22,8 @@ export default function CommissionsView({ user, agents = [] }) {
   const [deleting, setDeleting] = useState(false)
   const [leads, setLeads] = useState([])
   const [properties, setProperties] = useState([])
+  const [payTarget, setPayTarget] = useState(null)
+  const [paying, setPaying] = useState(false)
 
   // ---- Fetch Summary ----
   const fetchSummary = async () => {
@@ -204,6 +206,27 @@ export default function CommissionsView({ user, agents = [] }) {
     } catch (err) {
       setSaveMsg({ type: 'error', text: 'Error de conexión' })
     }
+    setTimeout(() => setSaveMsg(null), 3000)
+  }
+
+  // ---- Quick pay ----
+  const handleQuickPay = async () => {
+    if (!payTarget) return
+    setPaying(true)
+    try {
+      const res = await api.put(`/commissions/${payTarget.id}`, { status: 'paid' })
+      if (res.ok) {
+        setSaveMsg({ type: 'success', text: 'Comisión marcada como pagada' })
+        setPayTarget(null)
+        fetchDetail(detail.page)
+      } else {
+        const err = await res.json()
+        setSaveMsg({ type: 'error', text: err.error || 'Error al marcar como pagada' })
+      }
+    } catch (err) {
+      setSaveMsg({ type: 'error', text: 'Error de conexión' })
+    }
+    setPaying(false)
     setTimeout(() => setSaveMsg(null), 3000)
   }
 
@@ -467,9 +490,20 @@ export default function CommissionsView({ user, agents = [] }) {
                             <td className="px-4 py-3 text-slate-400 text-sm">{new Date(c.createdAt).toLocaleDateString('es-AR')}</td>
                             {isAdmin && (
                               <td className="px-4 py-3 text-center">
-                                <button onClick={() => startEdit(c)} className="p-1.5 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg text-blue-400 transition-colors">
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center justify-center gap-2">
+                                  {c.status === 'pending' && (
+                                    <button
+                                      onClick={() => setPayTarget(c)}
+                                      className="p-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 rounded-lg text-emerald-400 transition-colors"
+                                      title="Marcar como pagada"
+                                    >
+                                      <DollarSign className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  <button onClick={() => startEdit(c)} className="p-1.5 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg text-blue-400 transition-colors">
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </td>
                             )}
                           </>
@@ -707,6 +741,37 @@ export default function CommissionsView({ user, agents = [] }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Pay Commission Confirmation Modal */}
+      {payTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-3">Marcar como pagada</h3>
+            <p className="text-slate-300 text-sm mb-2">
+              ¿Confirmás que la comisión de <span className="text-emerald-400 font-semibold">{fmt(payTarget.amount)}</span> fue pagada?
+            </p>
+            <p className="text-slate-500 text-xs mb-6">
+              Agente: {payTarget.agentName || '—'} · Lead: {payTarget.leadName || '—'}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setPayTarget(null)}
+                disabled={paying}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleQuickPay}
+                disabled={paying}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-colors"
+              >
+                {paying ? 'Procesando...' : 'Confirmar pago'}
+              </button>
+            </div>
           </div>
         </div>
       )}
