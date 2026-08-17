@@ -36,6 +36,7 @@ const followupRoutes = require('./routes/followups');
 const statsRoutes = require('./routes/stats');
 const documentRoutes = require('./routes/documents');
 const folderRoutes = require('./routes/folders');
+const { router: commissionRoutes } = require('./routes/commissions');
 const { testConnection } = require('./services/cloudinaryService');
 const { testInstagramConnection } = require('./services/instagramPublisher');
 const { requireAuth } = require('./middleware/auth');
@@ -124,6 +125,7 @@ app.use('/api/permissions', generalRateLimit(100, 60000), requireAuth, require('
 app.use('/api/assignment', generalRateLimit(100, 60000), requireAuth, require('./routes/assignment'));
 app.use('/api/documents', generalRateLimit(100, 60000), requireAuth, documentRoutes);
 app.use('/api/folders', generalRateLimit(100, 60000), requireAuth, folderRoutes);
+app.use('/api/commissions', generalRateLimit(100, 60000), requireAuth, commissionRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
