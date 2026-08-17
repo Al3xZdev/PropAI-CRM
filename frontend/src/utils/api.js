@@ -8,12 +8,34 @@
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
+// Single-flight refresh: several 401s in parallel share one refresh attempt
+let refreshing = null
+
+/**
+ * Try to renew the httpOnly session via the refresh cookie.
+ * The backend rotates both cookies on success (accessToken 30m, refreshToken 7d).
+ */
+async function tryRefreshSession() {
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    return res.ok
+  } catch (e) {
+    return false
+  }
+}
+
 /**
  * Core fetch wrapper — always sends credentials (httpOnly cookies).
  * Returns the raw Response object — caller handles .json(), .blob(), etc.
  *
- * On 401: clears user state and reloads the page (back to login).
- * Components can still catch 401 themselves before this handler fires.
+ * On 401: attempts one automatic session refresh (single-flight) and retries
+ * the original request once. If the refresh fails, clears user state and
+ * reloads the page (back to login). Components can still catch 401
+ * themselves before this handler fires.
  */
 export async function apiFetch(endpoint, options = {}) {
   const config = {
@@ -27,7 +49,17 @@ export async function apiFetch(endpoint, options = {}) {
     config.headers = { ...config.headers, ...options.headers }
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, config)
+  let response = await fetch(`${API_URL}${endpoint}`, config)
+
+  if (response.status === 401) {
+    // Renew the session once before giving up
+    if (!refreshing) {
+      refreshing = tryRefreshSession().finally(() => { refreshing = null })
+    }
+    if (await refreshing) {
+      response = await fetch(`${API_URL}${endpoint}`, config)
+    }
+  }
 
   if (response.status === 401) {
     localStorage.removeItem('user')

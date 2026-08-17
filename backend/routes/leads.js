@@ -4,9 +4,11 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../services/db');
 const { requireAuth } = require('./auth');
-const { sanitizeLead, validateLead, sanitizeString, isValidUUID } = require('../utils/validation');
+const { sanitizeLead, validateLead, sanitizeString, isValidUUID, normalizePhone } = require('../utils/validation');
 const { calculateScore } = require('../services/leadScoringService');
 const permissionsService = require('../services/permissionsService');
+const { createCommissionForClosedLead } = require('../services/commissionService');
+const { ensurePropertyInPrisma } = require('../services/propertySyncService');
 
 // Apply auth middleware to all routes
 router.use(requireAuth);
@@ -200,12 +202,12 @@ router.post('/', async (req, res) => {
     const { name, email, phone, channel, propertyInterest, propertyId, propertyTitle, source, notes } = cleanLead;
 
     // Validar propertyId si se proporciona
+    // Si la propiedad solo existe en el JSON, la sincronizamos a Prisma
+    // para que la FK de Lead.propertyId no falle.
     let validPropertyId = null;
     if (propertyId && isValidUUID(propertyId)) {
-      const property = await prisma.property.findFirst({
-        where: { id: propertyId, tenantId: req.tenantId }
-      });
-      if (property) {
+      const synced = await ensurePropertyInPrisma(propertyId, req.tenantId);
+      if (synced) {
         validPropertyId = propertyId;
       }
     }
@@ -255,16 +257,27 @@ router.put('/:id', async (req, res) => {
 
     const { name, email, phone, channel, status, propertyInterest, propertyId, propertyTitle, source, notes } = req.body;
 
+    // Si se vincula una propiedad que solo existe en el JSON, la sincronizamos
+    // a Prisma primero para que la FK no falle.
+    let finalPropertyId = propertyId;
+    if (propertyId) {
+      const synced = await ensurePropertyInPrisma(propertyId, req.tenantId);
+      if (!synced) {
+        return res.status(400).json({ error: 'La propiedad seleccionada no existe' });
+      }
+      finalPropertyId = propertyId;
+    }
+
     const updatedLead = await prisma.lead.update({
       where: { id: req.params.id },
       data: {
         ...(name && { name }),
         ...(email !== undefined && { email }),
-        ...(phone !== undefined && { phone }),
+        ...(phone !== undefined && { phone: normalizePhone(phone) }),
         ...(channel && { channel }),
         ...(status && { status }),
         ...(propertyInterest !== undefined && { propertyInterest }),
-        ...(propertyId !== undefined && { propertyId }),
+        ...(propertyId !== undefined && { propertyId: finalPropertyId }),
         ...(propertyTitle !== undefined && { propertyTitle }),
         ...(source !== undefined && { source }),
         ...(notes !== undefined && { notes }),
@@ -314,10 +327,10 @@ router.delete('/:id', async (req, res) => {
  */
 router.post('/:id/followups', async (req, res) => {
   try {
-    const { day, channel, message } = req.body;
-    
-    if (!day || !channel || !message) {
-      return res.status(400).json({ error: 'Día, canal y mensaje son requeridos' });
+    const { type, note, message, scheduledAt } = req.body;
+
+    if (!scheduledAt) {
+      return res.status(400).json({ error: 'La fecha programada es requerida' });
     }
 
     // Verify lead belongs to tenant
@@ -334,11 +347,12 @@ router.post('/:id/followups', async (req, res) => {
 
     const followUp = await prisma.followUp.create({
       data: {
+        tenantId: req.tenantId,
         leadId: req.params.id,
-        day,
-        channel,
-        message,
-        automated: false
+        createdBy: req.userId,
+        type: type || 'manual',
+        note: note || message || null,
+        scheduledAt: new Date(scheduledAt)
       }
     });
     
@@ -573,15 +587,42 @@ router.put('/:id/status', async (req, res) => {
       }
     });
     
+    // Estados que implican que el lead respondió o cerró: sale de la automatización
+    const isResponded = ['respondio', 'visita_agendada', 'visita_realizada', 'cerrado', 'perdido'].includes(status);
+    
     const updatedLead = await prisma.lead.update({
       where: { id: req.params.id },
       data: { 
         status,
-        lastContact: ['contactado', 'respondio', 'visita_agendada', 'visita_realizada', 'cerrado'].includes(status) ? new Date() : undefined
+        lastContact: ['contactado', 'respondio', 'visita_agendada', 'visita_realizada', 'cerrado'].includes(status) ? new Date() : undefined,
+        ...(isResponded ? {
+          inAutomation: false,
+          automationPaused: false,
+          automationExitedAt: new Date(),
+          automationExitReason: 'lead_responded'
+        } : {})
       }
     });
-    
-    res.json({ success: true, lead: updatedLead });
+
+    const responseData = { success: true, lead: updatedLead };
+
+    if (status === 'cerrado') {
+      try {
+        const commissionResult = await createCommissionForClosedLead(updatedLead, req.tenantId);
+        responseData.commissionCreated = commissionResult.created;
+        if (commissionResult.created) {
+          responseData.commission = commissionResult.commission;
+        } else {
+          responseData.commissionReason = commissionResult.reason;
+        }
+      } catch (err) {
+        console.warn('Error creating commission for closed lead:', err);
+        responseData.commissionCreated = false;
+        responseData.commissionReason = 'error';
+      }
+    }
+
+    res.json(responseData);
   } catch (error) {
     console.error('Error updating status:', error);
     res.status(500).json({ error: 'Error al actualizar estado' });

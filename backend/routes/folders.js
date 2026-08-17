@@ -217,13 +217,13 @@ router.delete('/:id', async (req, res) => {
 
     // Move documents in this folder to root (null folderId)
     await prisma.document.updateMany({
-      where: { folderId: req.params.id },
+      where: { folderId: req.params.id, tenantId: req.tenantId },
       data: { folderId: null }
     });
 
     // Get all direct children and move them to root
     const children = await prisma.folder.findMany({
-      where: { parentId: req.params.id }
+      where: { parentId: req.params.id, tenantId: req.tenantId }
     });
 
     for (const child of children) {

@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { useNotifications } from '../hooks/useNotifications'
 import { api } from '../utils/api'
+import PhoneInput from '../components/PhoneInput'
+import { isValidPhoneNumber } from 'libphonenumber-js'
 
 // Channel configuration
 const CHANNEL_CONFIG = {
@@ -459,23 +461,20 @@ export default function InboxPage() {
         setEmailSubject('')
         setEmailBody('')
         // Show success notification
-        addNotification({
-          type: 'post_published',
+        addNotification('post_published', {
           title: 'Email enviado',
           description: `Email enviado exitosamente a ${leadEmail}`
         })
       } else {
         const err = await response.json()
-        addNotification({
-          type: 'post_error',
+        addNotification('post_error', {
           title: 'Error',
           description: err.error || 'Error al enviar email'
         })
       }
     } catch (err) {
       console.error('Error sending email:', err)
-      addNotification({
-        type: 'post_error',
+      addNotification('post_error', {
         title: 'Error',
         description: 'Error al enviar email'
       })
@@ -521,8 +520,7 @@ export default function InboxPage() {
         setShowAddResponseModal(false)
         setResponseSubject('')
         setResponseBody('')
-        addNotification({
-          type: 'new_message',
+        addNotification('message_sent', {
           title: 'Respuesta registrada',
           description: `Respuesta de ${selectedConversation.leadName} registrada`
         })
@@ -703,6 +701,10 @@ export default function InboxPage() {
     if (!selectedConversation?.leadId) return
     if (!convertForm.name.trim()) {
       alert('El nombre es requerido')
+      return
+    }
+    if (convertForm.phone && !isValidPhoneNumber(convertForm.phone)) {
+      showToast('error', 'El número de teléfono es inválido para el país seleccionado')
       return
     }
 
@@ -1095,11 +1097,9 @@ export default function InboxPage() {
                         
                         <div>
                           <label className="block text-slate-400 text-sm mb-1">Teléfono</label>
-                          <input
-                            type="tel"
+                          <PhoneInput
                             value={convertForm.phone}
-                            onChange={(e) => setConvertForm(prev => ({ ...prev, phone: e.target.value }))}
-                            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                            onChange={(value) => setConvertForm(prev => ({ ...prev, phone: value }))}
                             placeholder="+54 11 1234-5678"
                           />
                         </div>

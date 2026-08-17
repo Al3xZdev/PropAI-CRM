@@ -90,7 +90,8 @@ router.get('/:id', async (req, res) => {
         },
         property: {
           select: { id: true, title: true, address: true }
-        }
+        },
+        folder: { select: { id: true, name: true, color: true } }
       }
     });
 
@@ -148,22 +149,8 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Se requiere un archivo o URL' });
     }
 
-    // ✅ Si no se especifica folderId, buscar o crear carpeta por defecto del lead
-    let finalFolderId = folderId || null;
-    if (!finalFolderId) {
-      // Buscar si existe carpeta "Documentos" para este lead
-      let defaultFolder = await prisma.folder.findFirst({
-        where: { leadId, name: 'Documentos', tenantId: req.tenantId }
-      });
-      
-      // Si no existe, crear una carpeta por defecto
-      if (!defaultFolder) {
-        defaultFolder = await prisma.folder.create({
-          data: { tenantId: req.tenantId, leadId, name: 'Documentos', color: '#3B82F6' }
-        });
-      }
-      finalFolderId = defaultFolder.id;
-    }
+    // folderId vacío o "null" = documento en la raíz (sin carpeta)
+    const finalFolderId = (folderId && folderId !== 'null') ? folderId : null;
 
     // Create document record
     const document = await prisma.document.create({
@@ -191,7 +178,8 @@ router.post('/', upload.single('file'), async (req, res) => {
       where: { id: document.id },
       include: {
         lead: { select: { id: true, name: true, email: true } },
-        property: { select: { id: true, title: true, address: true } }
+        property: { select: { id: true, title: true, address: true } },
+        folder: { select: { id: true, name: true, color: true } }
       }
     });
 
@@ -225,7 +213,20 @@ router.put('/:id', async (req, res) => {
     if (status !== undefined) updateData.status = status;
     if (notes !== undefined) updateData.notes = notes;
     if (expiresAt !== undefined) updateData.expiresAt = expiresAt ? new Date(expiresAt) : null;
-    if (folderId !== undefined) updateData.folderId = folderId; // Allow moving to different folder
+    if (folderId !== undefined) {
+      // 'null' o '' = mover a la raíz (sin carpeta)
+      const targetFolderId = (folderId && folderId !== 'null') ? folderId : null;
+      // Validar que la carpeta destino pertenezca al tenant (aislamiento)
+      if (targetFolderId) {
+        const targetFolder = await prisma.folder.findFirst({
+          where: { id: targetFolderId, tenantId: req.tenantId }
+        });
+        if (!targetFolder) {
+          return res.status(404).json({ error: 'Carpeta destino no encontrada' });
+        }
+      }
+      updateData.folderId = targetFolderId;
+    }
 
     const document = await prisma.document.update({
       where: { id: req.params.id },

@@ -12,13 +12,9 @@ import { useNotifications, NOTIFICATION_TYPES } from '../hooks/useNotifications'
 import ChatModal from '../components/ChatModal'
 import GenerateContractModal from '../components/GenerateContractModal'
 import LeadContractsHistory from '../components/contracts/LeadContractsHistory'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-  'Content-Type': 'application/json'
-})
+import PhoneInput from '../components/PhoneInput'
+import { isValidPhoneNumber } from 'libphonenumber-js'
+import { api } from '../utils/api'
 
 const LeadsPage = ({ onSelectLead, properties = [] }) => {
   const { addNotification } = useNotifications()
@@ -71,7 +67,7 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
 
   const loadLeads = async () => {
     try {
-      const response = await fetch(`${API_URL}/leads`, { headers: getAuthHeaders() })
+      const response = await api.get('/leads')
       if (response.ok) {
         const data = await response.json()
         setLeads(data.leads || [])
@@ -87,7 +83,7 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
   const loadSequencesData = async () => {
     try {
       // Get all sequences
-      const seqRes = await fetch(`${API_URL}/automation/sequences`, { headers: getAuthHeaders() })
+      const seqRes = await api.get('/automation/sequences')
       if (seqRes.ok) {
         const seqData = await seqRes.json()
         setSequences(seqData.sequences || [])
@@ -95,9 +91,9 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
       
       // Get leads in each sequence with their step progress
       const leadsInSeqData = {}
-      for (const seq of sequences) {
+      for (const seq of seqData?.sequences || []) {
         try {
-          const res = await fetch(`${API_URL}/automation/sequences/${seq.id}/leads`, { headers: getAuthHeaders() })
+          const res = await api.get(`/automation/sequences/${seq.id}/leads`)
           if (res.ok) {
             const data = await res.json()
             // Store full lead objects with currentStep info
@@ -152,17 +148,11 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
     if (!sequenceId) return false
     
     try {
-      const response = await fetch(`${API_URL}/automation/sequences/${sequenceId}/leads/${leadId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      })
+      const response = await api.delete(`/automation/sequences/${sequenceId}/leads/${leadId}`)
       
       if (response.ok) {
         // Also stop automation for this lead
-        await fetch(`${API_URL}/leads/${leadId}/automation/stop`, {
-          method: 'POST',
-          headers: getAuthHeaders()
-        })
+        await api.post(`/leads/${leadId}/automation/stop`)
         
         // Reload data
         await loadLeads()
@@ -244,10 +234,7 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
     
     try {
       for (const leadId of selectedLeads) {
-        const response = await fetch(`${API_URL}/leads/${leadId}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders()
-        })
+        const response = await api.delete(`/leads/${leadId}`)
         if (response.ok) {
           deleted++
         }
@@ -359,11 +346,7 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
   const createLead = async (formData) => {
     setCreatingLead(true)
     try {
-      const response = await fetch(`${API_URL}/leads`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(formData)
-      })
+      const response = await api.post('/leads', formData)
       
       if (response.ok) {
         const data = await response.json()
@@ -820,6 +803,7 @@ const LeadsPage = ({ onSelectLead, properties = [] }) => {
           onRemoveFromSequence={removeLeadFromSequence}
           getLeadSequenceName={getLeadSequenceName}
           getLeadInSequence={getLeadInSequence}
+          properties={properties}
         />
       )}
 
@@ -920,9 +904,18 @@ const CreateLeadModal = ({ onClose, onCreate, isCreating, properties }) => {
   })
   const [showSuccess, setShowSuccess] = useState(false)
   const [createdLeadName, setCreatedLeadName] = useState('')
+  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+  const [toastType, setToastType] = useState('success')
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      setToastMessage('El número de teléfono es inválido para el país seleccionado')
+      setToastType('error')
+      setShowToast(true)
+      return
+    }
     setCreatedLeadName(formData.name)
     onCreate(formData)
   }
@@ -1015,11 +1008,9 @@ const CreateLeadModal = ({ onClose, onCreate, isCreating, properties }) => {
             </div>
             <div>
               <label className="block text-slate-400 text-sm mb-1">Teléfono</label>
-              <input
-                type="tel"
+              <PhoneInput
                 value={formData.phone}
-                onChange={(e) => setFormData(f => ({ ...f, phone: e.target.value }))}
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white focus:border-blue-500 outline-none"
+                onChange={(value) => setFormData(f => ({ ...f, phone: value }))}
                 placeholder="+54 11 1234-5678"
               />
             </div>
@@ -1130,6 +1121,10 @@ const CreateLeadModal = ({ onClose, onCreate, isCreating, properties }) => {
           </div>
         </form>
       </div>
+
+      {showToast && (
+        <Toast message={toastMessage} type={toastType} onClose={() => setShowToast(false)} />
+      )}
     </div>
   )
 }
@@ -1419,11 +1414,7 @@ const ImportLeadsModal = ({ isOpen, onClose, onImport, properties = [] }) => {
       
       for (const lead of leadsToImport) {
         try {
-          const response = await fetch(`${API_URL}/leads`, {
-            method: 'POST',
-            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(lead)
-          })
+          const response = await api.post('/leads', lead)
           
           if (response.ok) {
             results.success++
@@ -1447,21 +1438,21 @@ const ImportLeadsModal = ({ isOpen, onClose, onImport, properties = [] }) => {
   
   const downloadSampleCSV = () => {
     const sampleData = `nombre,email,teléfono,canal,tipo_propiedad,propiedad,fuente,notas
-María González,maria.gonzalez@email.com,+52 55 1234 5678,whatsapp,casa,Casa moderna en Lomas,Instagram,Interesada en casas con jardín
-Carlos Rodríguez,carlos.rod@email.com,+52 55 9876 5432,email,departamento,Departamento en Polanco,Formulario Web,Busca zona céntrica
-Ana Martínez,ana.martinez@email.com,+52 55 5555 4444,formulario,casa,Casa en Condesa,Portal Inmobiliario,Muy interesada
-Roberto Sánchez,roberto.s@email.com,+52 55 7777 8888,whatsapp,terreno,Terreno en CDMX,WhatsApp,Viene de recomendación
-Laura Hernández,laura.hernandez@email.com,+52 55 3333 2222,instagram,departamento,Penthouse en Santa Fe,Instagram,Cliente de alto perfil
-Diego Ramírez,diego.ram@email.com,+52 55 6666 5555,formulario,casa,Casa en Coyoacán,Formulario Web,Ya visitó el lugar
-Patricia López,patricia.l@email.com,+52 55 8888 9999,whatsapp,departamento,Departamento en Roma Norte,WhatsApp,Primera vez comprando
-Fernando Torres,fernando.torres@email.com,+52 55 1111 2222,email,local,Local comercial en Insurgentes,Email,Busca local para restaurante
-Carmen Rivera,carmen.rivera@email.com,+52 55 4444 3333,instagram,casa,Casa en San Ángel,Instagram,Muy interesada en ubicación
-José Luis Moreno,jose.moreno@email.com,+52 55 2222 3333,whatsapp,departamento,Departamento en Juárez,Facebook,Presupuesto flexible
-Gabriela Flores,gabriela.flores@email.com,+52 55 4444 5555,email,casa,Villa en Tlalpan,Referido,Conocida del agente
-Miguel Ángel Cruz,miguel.cruz@email.com,+52 55 6666 7777,formulario,terreno,Terreno en Huixquilucan,Web,Quisiera construir
-Sofía Ramírez,sofia.ramirez@email.com,+52 55 8888 9999,instagram,departamento,Loft en Roma,Instagram,Diseñadora de interiores
-Ricardo Vega,ricardo.vega@email.com,+52 55 1111 3333,whatsapp,casa,Casa en Alpes,WhatsApp,Inversionista
-Lucía Torres,lucia.torres@email.com,+52 55 5555 6666,email,oficina,Oficina en Santa Fe,LinkedIn,Para empresa nueva`
+María González,maria.gonzalez@email.com,+5491123456789,whatsapp,casa,Casa moderna en Lomas,Instagram,Interesada en casas con jardín
+Carlos Rodríguez,carlos.rod@email.com,+525512345678,email,departamento,Departamento en Polanco,Formulario Web,Busca zona céntrica
+Ana Martínez,ana.martinez@email.com,+34612345678,formulario,casa,Casa en Condesa,Portal Inmobiliario,Muy interesada
+Roberto Sánchez,roberto.s@email.com,+13055550199,whatsapp,terreno,Terreno en las afueras,WhatsApp,Viene de recomendación
+Laura Hernández,laura.hernandez@email.com,+56987654321,instagram,departamento,Penthouse en Santiago,Instagram,Cliente de alto perfil
+Diego Ramírez,diego.ram@email.com,+573001234567,formulario,casa,Casa en Bogotá,Formulario Web,Ya visitó el lugar
+Patricia López,patricia.l@email.com,+59899123456,whatsapp,departamento,Departamento en Montevideo,WhatsApp,Primera vez comprando
+Fernando Torres,fernando.torres@email.com,+51987654321,email,local,Local comercial en Miraflores,Email,Busca local para restaurante
+Carmen Rivera,carmen.rivera@email.com,+34987654321,instagram,casa,Casa en Valencia,Instagram,Muy interesada en ubicación
+José Luis Moreno,jose.moreno@email.com,+543511234567,whatsapp,departamento,Departamento en Córdoba,Facebook,Presupuesto flexible
+Gabriela Flores,gabriela.flores@email.com,+447911123456,email,casa,Casa en Londres,Referido,Conocida del agente
+Miguel Ángel Cruz,miguel.cruz@email.com,+525566778899,formulario,terreno,Terreno en Huixquilucan,Web,Quisiera construir
+Sofía Ramírez,sofia.ramirez@email.com,+59899887766,instagram,departamento,Loft en Pocitos,Instagram,Diseñadora de interiores
+Ricardo Vega,ricardo.vega@email.com,+56911223344,whatsapp,casa,Casa en Viña del Mar,WhatsApp,Inversionista
+Lucía Torres,lucia.torres@email.com,+34600112233,email,oficina,Oficina en Madrid,LinkedIn,Para empresa nueva`
     
     const blob = new Blob([sampleData], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -1988,17 +1979,13 @@ const SendFollowupModal = ({ isOpen, onClose, lead, onSend, channels = ['whatsap
     setGeneratingAI(true)
     try {
       // Try to use backend AI generation first
-      const response = await fetch(`${API_URL}/automation/generate-alternatives`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ 
-          step: { 
-            day: selectedDay, 
-            channels: [selectedChannel],
-            templates: defaultMessages[selectedDay]
-          }, 
-          lead 
-        })
+      const response = await api.post('/automation/generate-alternatives', { 
+        step: { 
+          day: selectedDay, 
+          channels: [selectedChannel],
+          templates: defaultMessages[selectedDay]
+        }, 
+        lead 
       })
       
       if (response.ok) {
@@ -2353,7 +2340,7 @@ const KanbanColumn = ({ title, color, leads, statusFilter, onLeadClick, selectio
 // ==========================================
 // COMPONENTE: Lead Detail Modal
 // ==========================================
-const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSequences = {}, onRemoveFromSequence, getLeadSequenceName, getLeadInSequence }) => {
+const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSequences = {}, onRemoveFromSequence, getLeadSequenceName, getLeadInSequence, properties = [] }) => {
   const [timeline, setTimeline] = useState([])
   const [loading, setLoading] = useState(true)
   const [showSendModal, setShowSendModal] = useState(false)
@@ -2363,8 +2350,15 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState('success')
   const [currentStatus, setCurrentStatus] = useState(lead.status)
+  const [localPropertyId, setLocalPropertyId] = useState(lead.propertyId || '')
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [showContractConfirm, setShowContractConfirm] = useState(false)
+
+  // Reset local property state when switching leads
+  useEffect(() => {
+    setLocalPropertyId(lead.propertyId || '')
+  }, [lead.id])
 
   // Get which sequence this lead is in
   const leadSequenceName = getLeadSequenceName ? getLeadSequenceName(lead.id) : null
@@ -2381,7 +2375,7 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
 
   const loadTimeline = async () => {
     try {
-      const response = await fetch(`${API_URL}/leads/${lead.id}/timeline`, { headers: getAuthHeaders() })
+      const response = await api.get(`/leads/${lead.id}/timeline`)
       if (response.ok) {
         const data = await response.json()
         setTimeline(data.timeline)
@@ -2396,16 +2390,12 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
   const sendFollowUp = async (leadData, day, channel, message) => {
     try {
       // Use the automation send endpoint
-      const response = await fetch(`${API_URL}/automation/send`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          lead: leadData,
-          channel,
-          message,
-          stepId: `day-${day}`,
-          sequenceId: 'manual'
-        })
+      const response = await api.post('/automation/send', {
+        lead: leadData,
+        channel,
+        message,
+        stepId: `day-${day}`,
+        sequenceId: 'manual'
       })
       
       if (response.ok) {
@@ -2427,22 +2417,36 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
 
   const updateStatus = async (status) => {
     try {
-      const response = await fetch(`${API_URL}/leads/${lead.id}/status`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ status })
-      })
+      const response = await api.put(`/leads/${lead.id}/status`, { status })
       if (response.ok) {
+        const data = await response.json().catch(() => ({}))
         setCurrentStatus(status)
         onUpdate?.()
         
-        // Si el lead pasa a "cerrado", ofrecer generar contrato
+        // Si el lead pasa a "cerrado", ofrecer generar contrato y avisar sobre la comisión
         if (status === 'cerrado') {
-          setToastMessage('Estado actualizado. ¿Deseas generar un contrato?')
-          setToastType('info')
+          let msg = 'Estado actualizado correctamente'
+          let type = 'success'
+          if (data.commissionCreated === true && data.commission) {
+            const c = data.commission
+            msg = `✓ Comisión generada: $${formatMoney(c.amount)} para el agente`
+            type = 'success'
+          } else if (data.commissionCreated === false) {
+            const reasons = {
+              no_agent: 'No se generó comisión: el lead no tiene agente asignado',
+              no_property_price: 'No se generó comisión: el lead no tiene propiedad con precio',
+              already_exists: 'El lead ya tenía una comisión creada',
+              error: 'No se pudo generar la comisión automática',
+              invalid_lead: 'No se pudo generar la comisión automática'
+            }
+            msg = `⚠ ${reasons[data.commissionReason] || 'No se generó comisión automática'}`
+            type = 'warning'
+          }
+          setToastMessage(msg)
+          setToastType(type)
           setShowToast(true)
-          // Abrir modal de contrato después de un breve delay
-          setTimeout(() => setShowContractModal(true), 1500)
+          // Preguntar si quiere generar el contrato (popup de confirmación)
+          setShowContractConfirm(true)
         } else {
           setToastMessage('Estado actualizado correctamente')
           setToastType('success')
@@ -2474,13 +2478,10 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
   const toggleAutomationPause = async () => {
     try {
       const endpoint = lead.automationPaused 
-        ? `${API_URL}/leads/${lead.id}/automation/resume`
-        : `${API_URL}/leads/${lead.id}/automation/pause`
+        ? `/leads/${lead.id}/automation/resume`
+        : `/leads/${lead.id}/automation/pause`
       
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      })
+      const response = await api.post(endpoint)
       
       if (response.ok) {
         const data = await response.json()
@@ -2502,10 +2503,7 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
   // Start automation sequence
   const startAutomation = async () => {
     try {
-      const response = await fetch(`${API_URL}/leads/${lead.id}/automation/start`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      })
+      const response = await api.post(`/leads/${lead.id}/automation/start`)
       
       if (response.ok) {
         const data = await response.json()
@@ -2586,6 +2584,37 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  const formatMoney = (value) => {
+    const num = Number(value)
+    if (Number.isNaN(num)) return '0'
+    return num.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  const updateProperty = async (propertyId) => {
+    const selected = properties.find(p => p.id === propertyId)
+    try {
+      const response = await api.put(`/leads/${lead.id}`, {
+        propertyId: propertyId || null,
+        propertyTitle: selected ? selected.title : null
+      })
+      if (response.ok) {
+        setLocalPropertyId(propertyId)
+        setToastMessage(selected ? `Propiedad vinculada: ${selected.title}` : 'Propiedad removida')
+        setToastType('success')
+        setShowToast(true)
+        onUpdate?.()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Response not ok')
+      }
+    } catch (err) {
+      console.error('Error updating property:', err)
+      setToastMessage(err.message === 'La propiedad seleccionada no existe' ? err.message : 'Error al vincular la propiedad')
+      setToastType('error')
+      setShowToast(true)
+    }
   }
 
   return (
@@ -2692,8 +2721,29 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
                 )}
               </div>
               <div className="bg-slate-700/50 rounded-xl p-4 col-span-2">
-                <p className="text-slate-400 text-sm mb-1">Propiedad</p>
-                <p className="text-white font-medium">{lead.propertyTitle || 'No especificada'}</p>
+                <p className="text-slate-400 text-sm mb-1">Propiedad (vinculada a comisión)</p>
+                {properties.length > 0 ? (
+                  <select
+                    value={localPropertyId}
+                    onChange={(e) => updateProperty(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sin propiedad</option>
+                    {properties.map(prop => (
+                      <option key={prop.id} value={prop.id}>
+                        {prop.title} — ${formatMoney(prop.price)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-white font-medium">{lead.propertyTitle || 'No especificada'}</p>
+                )}
+                {lead.propertyTitle && !properties.some(p => p.id === lead.propertyId) && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Actual: {lead.propertyTitle}
+                    {lead.propertyId ? '' : ' (sin id en la base de propiedades)'}
+                  </p>
+                )}
               </div>
               {lead.notes && (
                 <div className="bg-slate-700/50 rounded-xl p-4 col-span-2">
@@ -3024,6 +3074,41 @@ const LeadDetailModal = ({ lead, onClose, onUpdate, sequences = [], leadsInSeque
           console.log('Message sent:', message)
         }}
       />
+
+      {/* Contract Confirmation Popup */}
+      {showContractConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="relative bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-slate-700 shadow-2xl animate-scale-in">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 bg-blue-500/20 rounded-full flex items-center justify-center">
+                <FileText className="w-8 h-8 text-blue-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">¿Generar contrato?</h3>
+              <p className="text-slate-400">
+                El lead <span className="text-white font-semibold">{lead.name}</span> está cerrado. ¿Querés generar el contrato ahora?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowContractConfirm(false)}
+                className="flex-1 px-4 py-3 rounded-xl bg-slate-700 text-slate-200 font-medium hover:bg-slate-600 transition-colors"
+              >
+                No
+              </button>
+              <button
+                onClick={() => {
+                  setShowContractConfirm(false)
+                  setShowContractModal(true)
+                }}
+                className="flex-1 px-4 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-500 transition-colors"
+              >
+                Sí
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Generate Contract Modal */}
       <GenerateContractModal
