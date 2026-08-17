@@ -1,14 +1,7 @@
 // GenerateContractModal - Modal de 3 pasos para generar contratos inmobiliarios
 import { useState, useEffect } from 'react'
 import { X, FileText, User, Home, DollarSign, Check, ChevronRight, ChevronLeft, Loader2, Download, AlertCircle, File } from 'lucide-react'
-
-// BACKEND sin /api al final - se usa para URLs relativas
-const BACKEND = import.meta.env.VITE_API_URL?.replace(/\/api$/, "") || "http://localhost:3001";
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-  'Content-Type': 'application/json'
-})
+import { api } from '../utils/api'
 
 const CONTRACT_TYPES = [
   { value: 'compraventa', label: 'Compraventa', description: 'Contrato de compraventa de propiedad' },
@@ -101,22 +94,15 @@ export default function GenerateContractModal({ isOpen, onClose, lead, onContrac
     
     try {
       // Paso 1: generar el contrato
-      const response = await fetch(`${BACKEND}/api/contracts/generate`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          leadId: lead.id,
-          contractType: formData.contractType,
-          formData: {
-            ...formData,
-            price: formData.price ? parseFloat(formData.price) : null,
-            deposit: formData.deposit ? parseFloat(formData.deposit) : null,
-            commission_pct: formData.commission_pct ? parseFloat(formData.commission_pct) : null
-          }
-        })
+      const response = await api.post('/contracts/generate', {
+        leadId: lead.id,
+        contractType: formData.contractType,
+        formData: {
+          ...formData,
+          price: formData.price ? parseFloat(formData.price) : null,
+          deposit: formData.deposit ? parseFloat(formData.deposit) : null,
+          commission_pct: formData.commission_pct ? parseFloat(formData.commission_pct) : null
+        }
       })
       
       if (!response.ok) {
@@ -133,11 +119,8 @@ export default function GenerateContractModal({ isOpen, onClose, lead, onContrac
       // Notify parent
       onContractGenerated?.(doc)
 
-      // Paso 2: abrir descarga en nueva pestaña con token en URL
-      // El navegador descarga el archivo directamente
-      const token = localStorage.getItem('accessToken') || ''
-      const downloadUrl = `${BACKEND}/api/contracts/download/${doc.id}?token=${token}`
-      window.open(downloadUrl, '_blank')
+      // Paso 2: abrir descarga en nueva pestaña (mismo origin, cookie httpOnly vía proxy)
+      window.open(`/api/contracts/download/${doc.id}`, '_blank')
       
     } catch (err) {
       console.error('Error generating contract:', err)
@@ -155,12 +138,7 @@ const downloadContract = async () => {
   }
 
   try {
-    const url = `${BACKEND}/api/contracts/download/${generatedDoc.id}`;
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('accessToken') || ''}`,
-      },
-    });
+    const res = await api.get(`/contracts/download/${generatedDoc.id}`);
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

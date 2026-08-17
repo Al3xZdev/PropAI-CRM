@@ -1,17 +1,5 @@
 import { useState, useEffect } from "react";
-
-const BACKEND = import.meta.env.VITE_API_URL?.replace(/\/api$/, "") || "http://localhost:3001";
-
-function getToken() {
-  return localStorage.getItem("accessToken") || "";
-}
-
-function authHeaders(extra = {}) {
-  return {
-    Authorization: `Bearer ${getToken()}`,
-    ...extra,
-  };
-}
+import { api } from "../../utils/api";
 
 const TYPE_LABELS = {
   compraventa: "Compraventa",
@@ -82,10 +70,7 @@ export default function LeadContractsHistory({ leadId, onGenerateNew }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${BACKEND}/api/contracts?leadId=${leadId}`,
-        { headers: authHeaders() }
-      );
+      const res = await api.get(`/contracts?leadId=${leadId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setDocs(data.documents || data || []);
@@ -99,9 +84,8 @@ export default function LeadContractsHistory({ leadId, onGenerateNew }) {
   async function handleDownload(doc) {
     setDl(doc.id);
     try {
-      const token = localStorage.getItem("accessToken") || "";
-      const url = `${BACKEND}/api/contracts/download/${doc.id}?token=${token}`;
-      window.open(url, "_blank");
+      // Mismo origin vía proxy vite → la cookie httpOnly viaja automáticamente
+      window.open(`/api/contracts/download/${doc.id}`, "_blank");
     } catch (e) {
       alert(`Error al descargar: ${e.message}`);
     } finally {
