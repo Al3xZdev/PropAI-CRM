@@ -6,6 +6,50 @@ datasource db {
   provider = "postgresql"
 }
 
+enum CommissionStatus {
+  pending
+  paid
+}
+
+model AgentCommissionConfig {
+  id         String   @id @default(uuid())
+  tenantId   String
+  agentId    String
+  percentage Decimal  @default(3.0) @db.Decimal(5, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  agent      User     @relation(fields: [agentId], references: [id])
+
+  @@unique([tenantId, agentId])
+  @@index([tenantId])
+}
+
+model Commission {
+  id            String           @id @default(uuid())
+  tenantId      String
+  leadId        String
+  agentId       String
+  propertyId    String?
+  propertyTitle String?
+  propertyPrice Decimal          @db.Decimal(15, 2)
+  percentage    Decimal          @db.Decimal(5, 2)
+  amount        Decimal          @db.Decimal(15, 2)
+  notes         String?
+  status        CommissionStatus @default(pending)
+  paidAt        DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  lead          Lead             @relation(fields: [leadId], references: [id])
+  agent         User             @relation(fields: [agentId], references: [id])
+  property      Property?        @relation(fields: [propertyId], references: [id])
+
+  @@index([tenantId, agentId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+}
+
 model Tenant {
   id             String              @id @default(uuid())
   name           String
@@ -28,6 +72,8 @@ model Tenant {
   sequences      Sequence[]
   users          User[]
   auditLogs      AuditLog[]
+  agentCommissionConfigs AgentCommissionConfig[]
+  commissions            Commission[]
 }
 
 model User {
@@ -47,6 +93,8 @@ model User {
   assignedLeads Lead[]         @relation("AssignedLeads")
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   auditLogs     AuditLog[]    @relation("UserAuditLogs")
+  agentCommissionConfigs AgentCommissionConfig[]
+  commissions            Commission[]
 
   @@unique([tenantId, email])
 }
@@ -87,6 +135,7 @@ model Lead {
   leadSequences        LeadSequence[]
   statusHistory        LeadStatusHistory[]
   messages             Message[]           @relation("LeadMessages")
+  commissions          Commission[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -118,6 +167,7 @@ model Property {
   tenant         Tenant          @relation(fields: [tenantId], references: [id])
   scheduledPosts ScheduledPost[]
   documents      Document[]
+  commissions    Commission[]
 
   @@index([tenantId])
 }
@@ -199,6 +249,7 @@ model Message {
   content        String?
   mediaUrl       String?
   externalId     String?
+  sentViaApi     Boolean      @default(false)
   readAt         DateTime?
   sentAt         DateTime     @default(now())
   senderId       String?
@@ -225,20 +276,28 @@ model Integration {
 }
 
 model ScheduledPost {
-  id           String    @id @default(uuid())
-  tenantId     String
-  propertyId   String?
-  content      String
-  platform     String
-  scheduledFor DateTime
-  status       String    @default("pending")
-  sentAt       DateTime?
-  createdAt    DateTime  @default(now())
-  property     Property? @relation(fields: [propertyId], references: [id])
-  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  id            String    @id @default(uuid())
+  tenantId      String
+  propertyId    String?
+  scheduleId    String? // groups auto-generated posts from a single /schedule/create call
+  title         String    @default("Publicación Programada")
+  description   String?
+  type          String    @default("just_listed")
+  content       String    @default("") // caption fallback
+  contentJson   Json?     // rich content object { caption, images, ... }
+  platformsJson Json?     // [{ platform, enabled, scheduled, scheduledTime, published, publishedAt, link }]
+  platform      String    @default("instagram")
+  scheduledFor  DateTime
+  status        String    @default("scheduled") // scheduled | published | cancelled | pending
+  publishedAt   DateTime?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  property      Property? @relation(fields: [propertyId], references: [id])
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, scheduledFor])
   @@index([tenantId, status])
+  @@index([tenantId, scheduleId])
 }
 
 model Notification {
@@ -334,6 +393,7 @@ model Document {
   fileSize     Int?
   status       String   @default("draft") // draft | pending | signed | expired | rejected
   uploadType   String   @default("uploaded") // uploaded | generated
+  type         String?  // tipo de documento: contract_buy, contract_rent, contract_reserve, id_front, id_back, property_deed, receipt, credit_doc, lead_file, other
   contractType String?  // buy | rent | reserve (para contratos)
   expiresAt    DateTime? // fecha de vencimiento opcional
   notes        String?  // observaciones
