@@ -1,15 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { api } from "../../utils/api";
 
 // ─── config ───────────────────────────────────────────────────────────────────
-
-const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-function getAuthHeaders() {
-  return {
-    Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
-    "Content-Type": "application/json",
-  };
-}
 
 const DAYS_CONFIG = [
   { day: 1,  name: "Primer contacto"  },
@@ -46,14 +38,6 @@ const CHANNELS = [
       </svg>
     ),
   },
-  {
-    id: "facebook", label: "Facebook", color: "#1d4ed8", bg: "#eff6ff",
-    icon: (
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="#1d4ed8">
-        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-      </svg>
-    ),
-  },
 ];
 
 const VARIABLES = [
@@ -83,15 +67,9 @@ function getLocalTemplate(channel, dayIndex) {
       "{{nombre}} ✨ {{propiedad}} en {{precio}}. ¡No te lo pierdas! ¿Visitamos esta semana?",
       "Hola {{nombre}}, último mensaje de mi parte. Si querés retomar la búsqueda, acá estoy 😊",
     ],
-    facebook: [
-      "Hola {{nombre}}, te escribo porque viste {{propiedad}}. ¿Querés más información? Soy {{agente}} 😊",
-      "{{nombre}}, ¿pudiste pensar en {{propiedad}}? Sigue disponible. Podemos hablar cuando quieras.",
-      "Hola {{nombre}} 🏡 {{propiedad}} es una gran opción a {{precio}}. ¿Agendamos visita?",
-      "{{nombre}}, te mando este último mensaje sobre {{propiedad}}. Cualquier consulta futura, acá estoy. ¡Gracias!",
-    ],
   };
   return templates[channel]?.[dayIndex] || "";
-}
+};
 
 // ─── íconos ───────────────────────────────────────────────────────────────────
 
@@ -135,6 +113,43 @@ export default function SequenceBuilderV2({ onClose, onSave }) {
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState(null);
   const textareaRef                 = useRef(null);
+
+  // ── autocomplete de leads ──────────────────────────────────────────────────
+  const [allLeads, setAllLeads]       = useState([]);
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [leadQuery, setLeadQuery]     = useState("");
+  const [showLeads, setShowLeads]     = useState(false);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsError, setLeadsError]   = useState(null);
+  const leadInputRef                  = useRef(null);
+
+  // Cargar todos los leads una sola vez al abrir el modal
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLeadsLoading(true);
+      try {
+        const res = await api.get('/leads');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setAllLeads(data.leads || []);
+      } catch (e) {
+        console.error('Error loading leads for autocomplete:', e);
+        if (!cancelled) setLeadsError("No se pudieron cargar los leads.");
+      } finally {
+        if (!cancelled) setLeadsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filteredLeads = allLeads
+    .filter(l =>
+      l.name.toLowerCase().includes(leadQuery.toLowerCase()) ||
+      (l.email || "").toLowerCase().includes(leadQuery.toLowerCase()) ||
+      (l.phone || "").includes(leadQuery)
+    )
+    .slice(0, 10);
 
   const activeCh       = CHANNELS.find(c => c.id === channel);
   const generatedCount = generated.filter(Boolean).length;
@@ -219,6 +234,11 @@ export default function SequenceBuilderV2({ onClose, onSave }) {
       document.getElementById("sb2-name")?.focus();
       return;
     }
+    if (!selectedLead) {
+      setError("Seleccioná un lead de la lista para vincular la secuencia.");
+      setShowLeads(true);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -226,17 +246,14 @@ export default function SequenceBuilderV2({ onClose, onSave }) {
         name:        seqName.trim(),
         description: seqDesc.trim(),
         channel,
+        leadId:      selectedLead.id,
         steps: DAYS_CONFIG.map((d, i) => ({
           day:     d.day,
           name:    d.name,
           message: messages[i],
         })),
       };
-      const res = await fetch(`${API_URL}/automation/sequences`, {
-        method:  "POST",
-        headers: getAuthHeaders(),
-        body:    JSON.stringify(payload),
-      });
+      const res = await api.post('/automation/sequences', payload);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
@@ -290,6 +307,13 @@ export default function SequenceBuilderV2({ onClose, onSave }) {
           cursor: pointer; transition: all .12s; flex-shrink: 0;
         }
         .sb2-ch-btn:hover { border-color: #475569; }
+        .sb2-leads-dropdown {
+          position: absolute; z-index: 30; top: 100%; left: 0; right: 0;
+          background: #1e293b; border: 0.5px solid #334155; border-radius: 8px;
+          max-height: 220px; overflow-y: auto; margin-top: 4px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+        }
+        .sb2-leads-dropdown button:hover { background: #334155; }
         .sb2-timeline-wrap {
           padding: 16px 22px;
           border-bottom: 0.5px solid #475569;
@@ -424,18 +448,72 @@ export default function SequenceBuilderV2({ onClose, onSave }) {
               >×</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <div>
+              <div style={{ position: "relative" }}>
                 <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "5px" }}>
                   Nombre <span style={{ color: "#ef4444" }}>*</span>
                 </label>
                 <input
                   id="sb2-name"
                   type="text"
-                  placeholder="Ej: Seguimiento compradores"
+                  ref={leadInputRef}
+                  placeholder="Escribí el nombre del lead..."
                   value={seqName}
-                  onChange={e => setSeqName(e.target.value)}
+                  onChange={e => {
+                    setSeqName(e.target.value);
+                    setLeadQuery(e.target.value);
+                    setSelectedLead(null);
+                    setShowLeads(true);
+                  }}
+                  onFocus={() => setShowLeads(true)}
+                  onBlur={() => setTimeout(() => setShowLeads(false), 150)}
                   className="sb2-input"
                 />
+                {showLeads && (
+                  <div className="sb2-leads-dropdown">
+                    {leadsLoading ? (
+                      <div style={{ padding: "8px 10px", fontSize: "12px", color: "#94a3b8" }}>Cargando leads...</div>
+                    ) : leadsError ? (
+                      <div style={{ padding: "8px 10px", fontSize: "12px", color: "#f87171" }}>{leadsError}</div>
+                    ) : filteredLeads.length === 0 ? (
+                      <div style={{ padding: "8px 10px", fontSize: "12px", color: "#94a3b8" }}>No se encontraron leads</div>
+                    ) : (
+                      filteredLeads.map(l => (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            setSeqName(l.name);
+                            setLeadQuery(l.name);
+                            setSelectedLead(l);
+                            setShowLeads(false);
+                          }}
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 10px", fontSize: "13px", color: "#e2e8f0", background: "transparent", border: "none", cursor: "pointer", borderRadius: "6px" }}
+                        >
+                          <div style={{ fontWeight: 500 }}>{l.name}</div>
+                          {(l.email || l.phone) && (
+                            <div style={{ fontSize: "11px", color: "#94a3b8" }}>
+                              {[l.email, l.phone].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+                {selectedLead && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", padding: "4px 8px", background: "#134e4a", border: "0.5px solid #134e4a", borderRadius: "6px", fontSize: "12px", color: "#5eead4" }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      Lead vinculado: {selectedLead.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLead(null)}
+                      title="Desvincular lead"
+                      style={{ background: "none", border: "none", color: "#5eead4", cursor: "pointer", fontWeight: "bold", lineHeight: 1, padding: "0 2px", fontSize: "14px", flexShrink: 0 }}
+                    >×</button>
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "5px" }}>
@@ -609,7 +687,7 @@ export default function SequenceBuilderV2({ onClose, onSave }) {
               <button
                 className="sb2-start-btn"
                 onClick={handleStart}
-                disabled={generatedCount === 0 || saving}
+                disabled={!selectedLead || generatedCount === 0 || saving}
               >
                 {saving ? <SpinIcon /> : <PlayIcon />}
                 {saving ? "Guardando..." : "Crear secuencia"}

@@ -120,7 +120,7 @@ router.get('/sequences/:id', async (req, res) => {
  */
 router.post('/sequences', async (req, res) => {
   try {
-    const { name, description, steps, isActive, channel } = req.body;
+    const { name, description, steps, isActive, channel, leadId } = req.body;
     
     if (!name) {
       return res.status(400).json({ error: 'El nombre es requerido' });
@@ -135,6 +135,16 @@ router.post('/sequences', async (req, res) => {
       });
     }
 
+    // Si se vincula un lead, verificar que pertenezca al tenant
+    if (leadId) {
+      const lead = await prisma.lead.findFirst({
+        where: { id: leadId, tenantId: req.tenantId }
+      });
+      if (!lead) {
+        return res.status(400).json({ error: 'Lead no encontrado para este tenant' });
+      }
+    }
+
     const sequence = await prisma.sequence.create({
       data: {
         tenantId: req.tenantId,
@@ -146,6 +156,15 @@ router.post('/sequences', async (req, res) => {
         isPaused: false
       }
     });
+
+    // Vincular el lead seleccionado a la secuencia (si se eligió uno)
+    if (leadId) {
+      await prisma.leadSequence.upsert({
+        where: { leadId_sequenceId: { leadId: leadId, sequenceId: sequence.id } },
+        update: {},
+        create: { leadId: leadId, sequenceId: sequence.id, currentStep: 0 }
+      });
+    }
     
     res.status(201).json({ success: true, sequence });
   } catch (error) {
@@ -160,7 +179,7 @@ router.post('/sequences', async (req, res) => {
  */
 router.put('/sequences/:id', async (req, res) => {
   try {
-    const { name, description, steps, isActive, isPaused } = req.body;
+    const { name, description, steps, isActive, isPaused, channel } = req.body;
     
     const existing = await prisma.sequence.findFirst({
       where: { 
@@ -180,11 +199,12 @@ router.put('/sequences/:id', async (req, res) => {
         ...(description !== undefined && { description }),
         ...(steps && { steps }),
         ...(isActive !== undefined && { isActive }),
-        ...(isPaused !== undefined && { isPaused })
+        ...(isPaused !== undefined && { isPaused }),
+        ...(channel !== undefined && { channel })
       }
 });
     
-    res.json({ success: true, sequences });
+    res.json({ success: true, sequence });
   } catch (error) {
     console.error('Error getting sequences:', error);
     res.status(500).json({ error: error.message });
@@ -250,21 +270,23 @@ router.delete('/sequences/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Secuencia no encontrada' });
     }
 
-    // Delete all leadSequence records for this sequence
-    await prisma.leadSequence.deleteMany({
-      where: { sequenceId: req.params.id }
-    });
-
-    // Update leads that were in this sequence
+    // Get leads in this sequence BEFORE deleting the join records
     const leadsInSeq = await prisma.leadSequence.findMany({
       where: { sequenceId: req.params.id },
       select: { leadId: true }
     });
     const leadIds = leadsInSeq.map(ls => ls.leadId);
+
+    // Delete all leadSequence records for this sequence
+    await prisma.leadSequence.deleteMany({
+      where: { sequenceId: req.params.id }
+    });
+
+    // Reset leads that were in this sequence
     if (leadIds.length > 0) {
       await prisma.lead.updateMany({
         where: { id: { in: leadIds } },
-        data: { inAutomation: false, automationStartedAt: null }
+        data: { inAutomation: false, automationPaused: false, automationStartedAt: null, automationExitedAt: null, automationExitReason: null }
       });
     }
 
@@ -469,10 +491,10 @@ router.get('/logs', requireAuth, async (req, res) => {
         followUps: {
           select: {
             id: true,
-            day: true,
-            channel: true,
-            message: true,
-            sentAt: true
+            type: true,
+            note: true,
+            scheduledAt: true,
+            completedAt: true
           }
         }
       }
@@ -486,10 +508,10 @@ router.get('/logs', requireAuth, async (req, res) => {
           id: followUp.id,
           leadId: lead.id,
           leadName: lead.name,
-          channel: followUp.channel,
-          message: followUp.message,
-          day: followUp.day,
-          sentAt: followUp.sentAt
+          channel: 'automation',
+          message: followUp.note,
+          day: null,
+          sentAt: followUp.scheduledAt
         });
       });
     });
@@ -596,13 +618,13 @@ router.post('/send', requireAuth, async (req, res) => {
     // Create a follow-up record
     const followUp = await prisma.followUp.create({
       data: {
+        tenantId: leadData.tenantId,
         leadId: leadData.id,
-        day: stepId || 1,
-        channel,
-        message,
-        automated: true,
-        sentAt: new Date(),
-        whatsappMessageId: result.messageId || null
+        createdBy: req.userId || 'system',
+        type: 'automation',
+        note: message,
+        scheduledAt: new Date(),
+        completedAt: new Date()
       }
     });
     
@@ -646,7 +668,13 @@ router.get('/sequences/:id/leads', requireAuth, async (req, res) => {
     const leadSequences = await prisma.leadSequence.findMany({
       where: {
         sequenceId: req.params.id,
-        lead: { tenantId: req.tenantId }
+        lead: { tenantId: req.tenantId },
+        // Excluir leads que salieron de la automatización sin completar el recorrido
+        // (respondieron, fueron detenidos). Los completados siguen visibles como "Completada".
+        NOT: {
+          lead: { automationExitedAt: { not: null } },
+          completedAt: null
+        }
       },
       include: {
         lead: {
@@ -1006,6 +1034,7 @@ router.post('/sequences/:id/start', requireAuth, async (req, res) => {
       data: {
         tenantId: req.tenantId,
         leadId,
+        createdBy: req.userId || 'system',
         type: result.success ? 'automated' : 'automated_failed',
         note: message,
         scheduledAt: new Date(),
