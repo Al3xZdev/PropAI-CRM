@@ -7,11 +7,7 @@ const { prisma } = require('../services/db');
 const { requireAuth } = require('./auth');
 const { generateContract } = require('../services/contractService');
 
-// Apply auth middleware to all routes
-router.use((req, res, next) => {
-  console.log('[CONTRACTS] Headers:', req.headers);
-  next();
-});
+// Apply auth middleware to all routes (httpOnly cookie vía middleware/auth.js)
 router.use(requireAuth);
 
 /**
@@ -94,7 +90,7 @@ router.post('/generate', async (req, res) => {
       data: {
         tenantId: req.tenantId,
         leadId: lead.id,
-        type: 'contract',
+        uploadType: 'generated',
         contractType: contractType,
         filename: filename,
         filePath: outputPath,
@@ -127,40 +123,16 @@ router.post('/generate', async (req, res) => {
 /**
  * GET /api/contracts/download/:id
  * Descarga un contrato generado (.docx)
- * Acepta token desde header o desde query param ?token=...
+ * Auth: httpOnly cookie vía requireAuth (router.use)
  */
 router.get('/download/:id', async (req, res) => {
   try {
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'real-estate-crm-secret-key-2024';
-    
-    // Aceptar token desde header O desde query param ?token=...
-    let token = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.slice(7);
-    } else if (req.query.token) {
-      token = req.query.token;
-    }
-
-    if (!token) {
-      return res.status(401).json({ error: 'Token requerido' });
-    }
-
-    // Verificar token manualmente
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-
     const { id } = req.params;
 
     const document = await prisma.document.findFirst({
       where: {
         id: id,
-        tenantId: decoded.tenantId
+        tenantId: req.tenantId
       }
     });
 
@@ -169,11 +141,12 @@ router.get('/download/:id', async (req, res) => {
     }
 
     const filePath = document.filePath;
-    
-    if (!fs.existsSync(filePath)) {
+
+    if (!filePath || !fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'Archivo no encontrado en el servidor' });
     }
 
+    res.download(filePath, document.filename || path.basename(filePath));
   } catch (error) {
     console.error('Error downloading contract:', error);
     res.status(500).json({ error: 'Error al descargar el contrato' });
@@ -192,7 +165,7 @@ router.get('/', async (req, res) => {
 
     const where = { tenantId: req.tenantId };
     if (leadId) where.leadId = leadId;
-    if (type) where.type = type;
+    if (type) where.contractType = type;
 
     console.log('[CONTRACTS] where:', where)
 
