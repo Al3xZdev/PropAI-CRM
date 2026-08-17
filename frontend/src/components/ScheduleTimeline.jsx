@@ -1,13 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Calendar, LayoutGrid, List, ChevronLeft, ChevronRight, Clock, MapPin, CheckCircle2, Play, AlertCircle, GripVertical, X, Plus, Filter } from 'lucide-react'
 import PostDetailModal from './PostDetailModal'
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
-
-const getAuthHeaders = () => ({
-  'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
-  'Content-Type': 'application/json'
-})
+import { api } from '../utils/api'
 
 const TYPE_CONFIG = {
   just_listed: {
@@ -226,7 +220,7 @@ const CalendarView = ({ posts, onPublish, onPostClick }) => {
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     const platform = post.platforms?.[0]?.platform || 'Instagram'
-                                    onPublish(platform)
+                                    onPublish(platform, post)
                                   }}
                                   className="px-1.5 py-0.5 bg-green-600 hover:bg-green-500 rounded text-white text-xs whitespace-nowrap"
                                 >
@@ -385,7 +379,7 @@ const KanbanView = ({ posts, onPublish, onPostClick }) => {
                         <button
                           onClick={() => {
                             const platform = post.platforms?.[0]?.platform || 'Instagram'
-                            onPublish(platform)
+                            onPublish(platform, post)
                           }}
                           className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded-lg text-xs text-white transition-colors"
                         >
@@ -519,7 +513,7 @@ const AgendaView = ({ posts, onPublish, onPostClick }) => {
                               <button
                                 onClick={() => {
                                   const platform = post.platforms?.[0]?.platform || 'Instagram'
-                                  onPublish(platform)
+                                  onPublish(platform, post)
                                 }}
                                 className="ml-auto px-3 py-1 bg-green-600 hover:bg-green-500 rounded-lg text-xs text-white transition-colors flex items-center gap-1"
                               >
@@ -579,10 +573,7 @@ export default function ScheduleTimeline({ schedule, onPublish, onNewSchedule, o
   // Handle delete post
   const handleDeletePost = async (postId) => {
     try {
-      await fetch(`${API_URL}/schedule/manual/${postId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      })
+      await api.delete(`/schedule/manual/${postId}`)
       setPosts(prev => prev.filter(p => p.id !== postId))
       onDelete?.(postId)
     } catch (err) {
@@ -590,12 +581,19 @@ export default function ScheduleTimeline({ schedule, onPublish, onNewSchedule, o
     }
   }
   
-  // Handle cancel post (just mark as cancelled)
-  const handleCancelPost = (postId) => {
-    setPosts(prev => prev.map(p => 
-      p.id === postId ? { ...p, status: 'cancelled' } : p
-    ))
-    onDelete?.(postId)
+  // Handle cancel post (marks as cancelled in the backend)
+  const handleCancelPost = async (postId) => {
+    try {
+      const postIndex = schedule?.posts?.findIndex(p => p.id === postId)
+      const scheduleId = schedule?.id || postId
+      await api.post(`/schedule/${scheduleId}/cancel/${postIndex >= 0 ? postIndex : 0}`, { postId })
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, status: 'cancelled' } : p
+      ))
+      onDelete?.(postId)
+    } catch (err) {
+      console.error('Error cancelling post:', err)
+    }
   }
   
   return (
@@ -665,14 +663,6 @@ export default function ScheduleTimeline({ schedule, onPublish, onNewSchedule, o
         </div>
       </div>
       
-      {/* Demo Mode Indicator */}
-      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-center gap-3">
-        <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-        <p className="text-amber-400 text-sm">
-          <span className="font-medium">Modo Demo:</span> La publicación está simulada. Cuando conectes la API de Meta, las publicaciones se enviarán a Instagram y Facebook.
-        </p>
-      </div>
-      
       {/* Content based on view */}
       <div className="glass-card p-6">
         {view === 'calendar' && (
@@ -699,8 +689,8 @@ export default function ScheduleTimeline({ schedule, onPublish, onNewSchedule, o
               ? { ...p, platformSettings } 
               : p
           ))
-          // Call parent onPublish with platform
-          onPublish?.(platform)
+          // Call parent onPublish with platform and the post being published
+          onPublish?.(platform, selectedPost)
           setSelectedPost(null)
         }}
         onDelete={handleDeletePost}

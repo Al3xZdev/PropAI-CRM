@@ -1,8 +1,9 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import { api } from '../utils/api'
 
 const NotificationsContext = createContext(null)
 
-// Generate unique IDs
+// Generate unique IDs (local/optimistic notifications only)
 const generateId = () => `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
 // Notification types with icons and colors
@@ -111,6 +112,52 @@ export const NOTIFICATION_TYPES = {
     borderColor: 'border-emerald-500/30',
     title: 'Automation reanudado',
     description: 'Seguimiento de {name} fue reanudado'
+  },
+
+  // Chat notifications (incoming WhatsApp / Instagram / Messenger)
+  CHAT_MESSAGE: {
+    id: 'chat_message',
+    type: 'chat_message',
+    icon: 'MessageCircle',
+    color: 'blue',
+    bgColor: 'bg-blue-500/20',
+    borderColor: 'border-blue-500/30',
+    title: 'Nuevo mensaje',
+    description: '{description}'
+  },
+
+  // Commission notifications
+  COMMISSION_PENDING: {
+    id: 'commission_pending',
+    type: 'commission_pending',
+    icon: 'BadgeDollarSign',
+    color: 'amber',
+    bgColor: 'bg-amber-500/20',
+    borderColor: 'border-amber-500/30',
+    title: 'Nueva comisión pendiente',
+    description: '{description}'
+  },
+  COMMISSION_OVERDUE: {
+    id: 'commission_overdue',
+    type: 'commission_overdue',
+    icon: 'DollarSign',
+    color: 'red',
+    bgColor: 'bg-red-500/20',
+    borderColor: 'border-red-500/30',
+    title: 'Comisiones vencidas',
+    description: '{description}'
+  },
+
+  // Follow-up notifications
+  FOLLOWUP_DUE: {
+    id: 'followup_due',
+    type: 'followup_due',
+    icon: 'AlarmClock',
+    color: 'amber',
+    bgColor: 'bg-amber-500/20',
+    borderColor: 'border-amber-500/30',
+    title: 'Tarea',
+    description: '{description}'
   }
 }
 
@@ -127,38 +174,74 @@ const ICONS = {
   Pause: '⏸️',
   Play: '▶️',
   Bell: '🔔',
-  Trash2: '🗑️'
+  Trash2: '🗑️',
+  DollarSign: '💰',
+  BadgeDollarSign: '💰',
+  AlarmClock: '⏰'
 }
 
 export const getIcon = (iconName) => ICONS[iconName] || '📢'
 
+// Lookup templates by notification.type (for notifications loaded from the API)
+const TEMPLATES_BY_TYPE = Object.values(NOTIFICATION_TYPES).reduce((acc, tpl) => {
+  acc[tpl.type] = tpl
+  return acc
+}, {})
+
+// Enrich a backend notification with icon/color so the bell can render it
+const mapApiNotification = (n) => {
+  const tpl = TEMPLATES_BY_TYPE[n.type]
+  return {
+    ...n,
+    description: n.description || '',
+    icon: tpl ? tpl.icon : 'Bell',
+    color: tpl ? tpl.color : 'blue',
+    bgColor: tpl ? tpl.bgColor : 'bg-blue-500/20',
+    borderColor: tpl ? tpl.borderColor : 'border-blue-500/30'
+  }
+}
+
+const POLL_INTERVAL = 15000
+
 export function NotificationsProvider({ children }) {
   const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
 
-  // Load from localStorage on mount
+  // Fetch from the real API (only when there is an authenticated session)
   useEffect(() => {
-    const saved = localStorage.getItem('notifications')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        setNotifications(parsed)
-        setUnreadCount(parsed.filter(n => !n.read).length)
-      } catch (e) {
-        console.error('Error loading notifications:', e)
+    let active = true
+
+    const fetchNotifications = async () => {
+      if (!localStorage.getItem('user')) {
+        setNotifications([])
+        return
       }
+      try {
+        const res = await api.get('/notifications')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!active) return
+        setNotifications((data.notifications || []).map(mapApiNotification))
+      } catch (err) {
+        console.error('Error fetching notifications:', err)
+      }
+    }
+
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, POLL_INTERVAL)
+    return () => {
+      active = false
+      clearInterval(interval)
     }
   }, [])
 
-  // Save to localStorage on change
-  useEffect(() => {
-    localStorage.setItem('notifications', JSON.stringify(notifications))
-    setUnreadCount(notifications.filter(n => !n.read).length)
-  }, [notifications])
-
-  // Add notification
+  // Add notification (local/optimistic fallback — the backend is the source of truth)
   const addNotification = useCallback((type, data = {}) => {
-    const template = NOTIFICATION_TYPES[type]
+    let template = null
+    if (typeof type === 'string') {
+      template = NOTIFICATION_TYPES[type]
+    } else if (type && typeof type === 'object' && type.id) {
+      template = NOTIFICATION_TYPES[type.id]
+    }
     if (!template) return null
 
     const notification = {
@@ -168,8 +251,8 @@ export function NotificationsProvider({ children }) {
       color: template.color,
       bgColor: template.bgColor,
       borderColor: template.borderColor,
-      title: template.title,
-      description: formatDescription(template.description, data),
+      title: data.title || template.title,
+      description: data.description || formatDescription(template.description, data),
       data,
       read: false,
       createdAt: new Date().toISOString()
@@ -179,32 +262,49 @@ export function NotificationsProvider({ children }) {
     return notification.id
   }, [])
 
-  // Mark as read
+  // Mark as read (optimistic + API)
   const markAsRead = useCallback((id) => {
-    setNotifications(prev => prev.map(n => 
+    setNotifications(prev => prev.map(n =>
       n.id === id ? { ...n, read: true } : n
     ))
+    api.put(`/notifications/${id}/read`, {}).catch(err => {
+      console.error('Error marking notification as read:', err)
+    })
   }, [])
 
-  // Mark all as read
+  // Mark all as read (optimistic + API)
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    api.put('/notifications/read-all', {}).catch(err => {
+      console.error('Error marking all notifications as read:', err)
+    })
   }, [])
 
-  // Remove notification
+  // Remove notification (optimistic + API)
   const removeNotification = useCallback((id) => {
     setNotifications(prev => prev.filter(n => n.id !== id))
+    api.delete(`/notifications/${id}`).catch(err => {
+      console.error('Error removing notification:', err)
+    })
   }, [])
 
-  // Clear all notifications
+  // Clear all notifications (optimistic + API)
   const clearAll = useCallback(() => {
     setNotifications([])
+    api.delete('/notifications/clear-all').catch(err => {
+      console.error('Error clearing notifications:', err)
+    })
   }, [])
 
   // Get unread count
   const getUnreadCount = useCallback(() => {
     return notifications.filter(n => !n.read).length
   }, [notifications])
+
+  const unreadCount = useMemo(
+    () => notifications.filter(n => !n.read).length,
+    [notifications]
+  )
 
   const value = {
     notifications,
