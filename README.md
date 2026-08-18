@@ -217,29 +217,9 @@ prop-ai-crm/
 
    Frontend runs at `http://localhost:5173`
 
-### Environment Variables
+### Installation
 
-```env
-# Database
-DATABASE_URL="postgresql://user:password@host:5432/propai_crm"
-
-# Authentication
-JWT_SECRET="your-64-character-secret"
-JWT_REFRESH_SECRET="your-refresh-secret"
-
-# External Services
-CLOUDINARY_CLOUD_NAME="your-cloud-name"
-CLOUDINARY_API_KEY="your-api-key"
-CLOUDINARY_API_SECRET="your-api-secret"
-RESEND_API_KEY="your-resend-key"
-
-# Instagram (optional)
-INSTAGRAM_ACCESS_TOKEN="your-instagram-token"
-```
-
----
-
-## API Reference
+1. **Clone the repository**
 
 ### Authentication
 
@@ -395,15 +375,15 @@ This is a proprietary project. For contribution inquiries, please contact the ma
 
 **Proprietary Software** — All rights reserved.
 
-This software is owned by [Alejandro Zdev](https://github.com/Al3xZdev). Unauthorized copying, modification, distribution, or use of this software is strictly prohibited without explicit written permission.
+This software is owned by Alexis Boianelli. Unauthorized copying, modification, distribution, or use of this software is strictly prohibited without explicit written permission.
 
-For licensing inquiries, please contact: **[your-email@example.com]**
+For licensing inquiries, please contact: **alexisboianelli@gmail.com**
 
 ---
 
 <div align="center">
 
-**Built with precision by [Alejandro Zdev](https://github.com/Al3xZdev)**
+**Built with precision by [Alexis Boianelli](https://github.com/Al3xZdev)**
 
 *Connecting real estate professionals with intelligent automation*
 
