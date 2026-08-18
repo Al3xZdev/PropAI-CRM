@@ -2,7 +2,11 @@
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../services/db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'real-estate-crm-secret-key-2024';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET no está configurado en las variables de entorno');
+  process.exit(1);
+}
 
 /**
  * Extract token from Authorization header (backward compatibility)

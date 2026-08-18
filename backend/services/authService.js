@@ -3,7 +3,11 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 // In production, use environment variables
-const JWT_SECRET = process.env.JWT_SECRET || 'real-estate-crm-secret-key-2024';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET no está configurado en las variables de entorno');
+  process.exit(1);
+}
 const JWT_EXPIRES_IN = '30m'; // Token expires in 30 minutes (SEGuro)
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token lasts 7 days
 
