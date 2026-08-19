@@ -398,4 +398,3 @@ frontend/src/
 
 ---
 
-*Documento creado para参考 - Revisar y ajustar según necesidades específicas del proyecto*
